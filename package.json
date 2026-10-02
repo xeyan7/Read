@@ -1,0 +1,14 @@
+{
+  "name": "focus-reader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bionic-reading aid browser extension (MV3) that bolds the start of words to help you read faster.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/shared.test.mjs test/ui.test.mjs",
+    "test:watch": "node --test --watch test/shared.test.mjs test/ui.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

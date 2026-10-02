@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Focus Reader — Preferences & Reading Studio</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/logo-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/logo-16.png">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="shell">
+    <!-- Brand Header -->
+    <header class="header">
+      <div class="brand-row">
+        <div class="logo-bezel">
+          <img src="icons/logo.png" alt="Focus Reader" class="logo-img">
+        </div>
+        <div class="header-text">
+          <div class="eyebrow-row">
+            <span class="eyebrow-pill">PRECISION READING ENGINE</span>
+            <span class="version-tag">v1.0</span>
+          </div>
+          <h1 class="title">Focus Reader Preferences</h1>
+          <p class="subtitle">Calibrate typographic fixation anchors, activation automation, and per-site rules.</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container Bento Layout -->
+    <div class="bento-layout">
+      <!-- 1. Activation Mode -->
+      <section class="card-shell" aria-labelledby="headingActivation">
+        <div class="card-core">
+          <div class="card-intro">
+            <span class="section-label">Engine Automation</span>
+            <h2 class="card-heading" id="headingActivation">Default Reading Behavior</h2>
+            <p class="card-desc">Choose whether Focus Reader activates on demand or automatically scans every article you visit.</p>
+          </div>
+
+          <div class="mode-group" role="radiogroup" aria-label="Default activation mode">
+            <div class="mode-item" id="modeManual" data-mode="manual" role="radio" aria-checked="true" tabindex="0">
+              <div class="radio-shell"><span class="radio-dot"></span></div>
+              <div class="mode-content">
+                <div class="mode-title-row">
+                  <span class="mode-title">Manual activation</span>
+                  <span class="mode-pill pill-recommended">Recommended</span>
+                </div>
+                <p class="mode-description">
+                  Focus Reader activates only when you click the popup or toggle the extension. Web pages stay untouched until you request reading assistance.
+                </p>
+              </div>
+            </div>
+
+            <div class="mode-item" id="modeAutomatic" data-mode="automatic" role="radio" aria-checked="false" tabindex="0">
+              <div class="radio-shell"><span class="radio-dot"></span></div>
+              <div class="mode-content">
+                <div class="mode-title-row">
+                  <span class="mode-title">Automatic reading</span>
+                  <span class="mode-pill pill-auto">Full auto</span>
+                </div>
+                <p class="mode-description">
+                  Automatically boldifies paragraphs across every website you open, unless you explicitly disable a specific site in the toolbar popup.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Reading Intensity & Typographic Anchor -->
+      <section class="card-shell" aria-labelledby="headingIntensity">
+        <div class="card-core">
+          <div class="card-intro">
+            <span class="section-label">Typographic Weight</span>
+            <h2 class="card-heading" id="headingIntensity">Reading Intensity &amp; Contrast</h2>
+            <p class="card-desc">Calibrates the font-weight ratio for bolded fixation syllables. Applied instantly to all open tabs.</p>
+          </div>
+
+          <div class="segmented" id="intensityGroup" role="radiogroup" aria-label="Bold intensity">
+            <button type="button" class="seg-item" data-intensity="light" role="radio" aria-checked="false">
+              <span class="seg-title">Light</span>
+              <span class="seg-meta">500 Medium</span>
+            </button>
+            <button type="button" class="seg-item is-selected" data-intensity="medium" role="radio" aria-checked="true">
+              <span class="seg-title">Medium</span>
+              <span class="seg-meta">700 Bold</span>
+            </button>
+            <button type="button" class="seg-item" data-intensity="strong" role="radio" aria-checked="false">
+              <span class="seg-title">Strong</span>
+              <span class="seg-meta">900 Black</span>
+            </button>
+          </div>
+
+          <div class="preview-box">
+            <div class="preview-box-header">
+              <span class="preview-label">Live Weight Reflection</span>
+              <span class="preview-badge" id="previewWeightBadge">Weight 700</span>
+            </div>
+            <p class="preview-sample" id="intensityPreview">
+              <span class="wb">Foc</span>us <span class="wb">rea</span>der <span class="wb">gui</span>des <span class="wb">yo</span>ur <span class="wb">ey</span>es <span class="wb">smoo</span>thly <span class="wb">throu</span>gh <span class="wb">lon</span>g <span class="wb">arti</span>cles.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Interactive Reading Studio / Sandbox -->
+      <section class="card-shell studio-shell" aria-labelledby="headingStudio">
+        <div class="card-core">
+          <div class="studio-header">
+            <div class="card-intro">
+              <span class="section-label">Cognitive Laboratory</span>
+              <h2 class="card-heading" id="headingStudio">Interactive Reading Studio</h2>
+              <p class="card-desc">Experience how fixation anchoring alters visual saccades across different literary styles.</p>
+            </div>
+            <div class="studio-actions">
+              <button type="button" id="studioToggleBtn" class="studio-btn studio-btn-primary" aria-pressed="true">
+                <span class="studio-btn-dot"></span>
+                <span id="studioToggleLabel">Bionic Mode ON</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Sample topic selector -->
+          <div class="studio-topics" role="tablist" aria-label="Studio reading topics">
+            <button type="button" class="topic-chip is-active" data-topic="science" role="tab" aria-selected="true">Neuroscience</button>
+            <button type="button" class="topic-chip" data-topic="philosophy" role="tab" aria-selected="false">Philosophy</button>
+            <button type="button" class="topic-chip" data-topic="technology" role="tab" aria-selected="false">Computing</button>
+            <button type="button" class="topic-chip" data-topic="literature" role="tab" aria-selected="false">Literature</button>
+          </div>
+
+          <!-- Studio Text Box -->
+          <div class="studio-viewport">
+            <p class="studio-paragraph" id="studioParagraph">
+              <!-- Dynamically populated by options.js -->
+            </p>
+          </div>
+
+          <!-- Studio Metric Telemetry -->
+          <div class="studio-metrics">
+            <div class="metric-cell">
+              <span class="metric-val">33%</span>
+              <span class="metric-key">Anchor Ratio</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-cell">
+              <span class="metric-val" id="metricWpm">~340</span>
+              <span class="metric-key">Est. WPM Pace</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-cell">
+              <span class="metric-val">100%</span>
+              <span class="metric-key">Client Privacy</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Site Rules Manager -->
+      <section class="card-shell" aria-labelledby="headingRules">
+        <div class="card-core">
+          <div class="card-intro">
+            <span class="section-label">Domain Routing</span>
+            <h2 class="card-heading" id="headingRules">Custom Site Rules</h2>
+            <p class="card-desc">Manage domain-specific exceptions saved from your browser toolbar popup.</p>
+          </div>
+
+          <!-- Add manual site rule form -->
+          <form id="addRuleForm" class="rule-add-bar">
+            <div class="input-wrap">
+              <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+              <input type="text" id="newRuleHost" class="rule-input" placeholder="e.g. nytimes.com, wikipedia.org" autocomplete="off" spellcheck="false" required>
+            </div>
+            <select id="newRuleAction" class="rule-select" aria-label="Rule Behavior">
+              <option value="true">Always Enabled</option>
+              <option value="false">Always Disabled</option>
+            </select>
+            <button type="submit" class="rule-add-btn">Add Rule</button>
+          </form>
+
+          <!-- Rules list container -->
+          <div class="rules-list-container">
+            <div id="siteRulesList" class="site-rules-list">
+              <!-- Dynamically populated with host rules -->
+            </div>
+            <div id="siteRulesEmpty" class="rules-empty-state" style="display: none;">
+              <div class="empty-icon-capsule">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <p class="empty-title">No custom site rules yet</p>
+              <p class="empty-sub">When you toggle Focus Reader on any website via the toolbar popup, that domain's preference will be stored and listed here.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div class="status-bar" id="statusBar" role="status">
+      <span class="status-icon" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </span>
+      <span class="status-text" id="statusText">Preferences synced to your browser account</span>
+    </div>
+
+    <!-- Architectural Footer -->
+    <footer class="footer">
+      <div class="footer-card">
+        <div class="footer-col">
+          <span class="footer-badge">SECURE CLIENT ENGINE</span>
+          <p class="footer-hint">Focus Reader processes all DOM transformations in-memory directly on your device. Zero reading content, browsing history, or analytics are ever collected or sent to external servers.</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
