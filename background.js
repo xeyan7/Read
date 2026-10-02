@@ -24,8 +24,18 @@ async function currentMode() {
 async function sendToTab(tabId, greeting) {
   try {
     await chrome.tabs.sendMessage(tabId, { greeting }, { frameId: 0 });
+    return;
   } catch (_) {
-    // Content script not yet injected
+    // No receiving end — tab predates the content script. Inject, retry once.
+    try {
+      if (chrome.scripting && chrome.scripting.executeScript) {
+        await chrome.scripting.executeScript({
+          target: { tabId, allFrames: false },
+          files: ['shared.js', 'content.js'],
+        });
+        await chrome.tabs.sendMessage(tabId, { greeting }, { frameId: 0 });
+      }
+    } catch (_) {}
   }
 }
 
@@ -107,6 +117,22 @@ chrome.runtime.onInstalled.addListener(async () => {
         128: 'icons/logo-128.png'
       }
     });
+  } catch (_) {}
+  // Tabs already open at install/update time never received the content
+  // script — inject it so messaging never hits a missing receiving end.
+  try {
+    if (chrome.scripting && chrome.scripting.executeScript) {
+      const tabs = (await chrome.tabs.query({})).filter(isWebTab);
+      for (const tab of tabs) {
+        if (tab.id == null) continue;
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id, allFrames: false },
+            files: ['shared.js', 'content.js'],
+          });
+        } catch (_) {}
+      }
+    }
   } catch (_) {}
 });
 

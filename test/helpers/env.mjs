@@ -24,6 +24,7 @@ export function createChromeMock(opts = {}) {
   const sentMessages = [];
   const badges = {};
   const tabMessages = [];
+  const injections = [];
 
   const pickKeys = (keys) => {
     if (keys == null) return { ...storage };
@@ -77,9 +78,14 @@ export function createChromeMock(opts = {}) {
       setBadgeBackgroundColor() {},
       async enable() {},
     },
+    scripting: {
+      async executeScript(opts) {
+        injections.push(opts);
+      },
+    },
   };
 
-  return { chrome, storage, messageListeners, sentMessages, badges, tabMessages };
+  return { chrome, storage, messageListeners, sentMessages, badges, tabMessages, injections };
 }
 
 /**

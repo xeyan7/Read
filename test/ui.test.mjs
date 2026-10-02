@@ -67,6 +67,36 @@ test('popup cycles sample sentences', async () => {
   assert.ok(updatedText.length > 10);
 });
 
+test('popup self-heals tabs missing the content script', async () => {
+  const html = readSource('popup.html');
+  let tabCalls = 0;
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'popup.js'],
+    tabs: [{ id: 7, url: 'https://example.com/article' }],
+    onTabMessage: () => {
+      tabCalls += 1;
+      // First message hits a stale tab: no receiving end (the reported bug).
+      if (tabCalls === 1) throw new Error('Could not establish connection. Receiving end does not exist.');
+      return true;
+    },
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  // Popup injected the scripts and retried instead of surfacing the error.
+  assert.equal(page.mock.injections.length, 1);
+  assert.equal(page.mock.injections[0].files.length, 2);
+  assert.equal(page.mock.injections[0].files[0], 'shared.js');
+  assert.equal(page.mock.injections[0].files[1], 'content.js');
+  assert.equal(page.mock.injections[0].target.tabId, 7);
+
+  const toggleBtn = page.document.getElementById('toggleButton');
+  assert.ok(toggleBtn.classList.contains('is-active'));
+  assert.equal(toggleBtn.getAttribute('aria-pressed'), 'true');
+});
+
 test('options page manages activation modes and reading studio', async () => {
   const html = readSource('options.html');
   const page = createPage({

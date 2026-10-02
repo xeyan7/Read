@@ -53,6 +53,27 @@ async function initPopup() {
     }
   };
 
+  // Send a message to the tab, self-healing tabs whose content script is
+  // missing (pages open before install/update). Returns the tab's response,
+  // or undefined when the tab cannot run content scripts at all.
+  // Never rejects, never logs — a missing receiver is an expected state.
+  async function sendTabMessage(tabId, msg) {
+    try {
+      return await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
+    } catch (_) {
+      try {
+        if (chrome.scripting && chrome.scripting.executeScript) {
+          await chrome.scripting.executeScript({
+            target: { tabId, allFrames: false },
+            files: ['shared.js', 'content.js'],
+          });
+          return await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
+        }
+      } catch (_) {}
+      return undefined;
+    }
+  }
+
   function updatePreviewSentence(sentence) {
     if (!previewSample) return;
     previewSample.innerHTML = '';
@@ -172,11 +193,12 @@ async function initPopup() {
   }
 
   // --- Query live state matching E:Read ---------------------------------------
-  try {
-    state.active = Boolean(await chrome.tabs.sendMessage(tab.id, { greeting: 'isActive' }, { frameId: 0 }));
-    state.reachable = true;
-  } catch {
-    state.reachable = false;
+  {
+    const resp = await sendTabMessage(tab.id, { greeting: 'isActive' });
+    state.reachable = resp !== undefined;
+    state.active = Boolean(resp);
+  }
+  if (!state.reachable) {
     // Fall back to stored preference if available
     try {
       const { mode, [state.host]: hostPref } = await chrome.storage.sync.get(['mode', state.host]);
@@ -194,12 +216,8 @@ async function initPopup() {
     toggleBtn.addEventListener('click', async () => {
       const next = !state.active;
       const greeting = next ? 'Activate' : 'Deactivate';
-      try {
-        await chrome.tabs.sendMessage(tab.id, { greeting });
-        state.reachable = true;
-      } catch (e) {
-        console.warn('Message send failed (tab may need refresh):', e);
-      }
+      const resp = await sendTabMessage(tab.id, { greeting });
+      state.reachable = resp !== undefined;
       state.active = next;
       state.override = true;
       render();
@@ -221,13 +239,9 @@ async function initPopup() {
       state.override = false;
       const { mode } = await chrome.storage.sync.get(['mode']);
       const shouldBeActive = mode === 'automatic';
-      try {
-        await chrome.tabs.sendMessage(tab.id, {
-          greeting: shouldBeActive ? 'Activate' : 'Deactivate',
-        });
-      } catch (e) {
-        console.warn('Message send failed:', e);
-      }
+      await sendTabMessage(tab.id, {
+        greeting: shouldBeActive ? 'Activate' : 'Deactivate',
+      });
       state.active = shouldBeActive;
       render();
     });
@@ -243,7 +257,7 @@ async function initPopup() {
       try {
         await chrome.storage.sync.set({ intensity: nextIntensity });
         if (tab && tab.id != null) {
-          await chrome.tabs.sendMessage(tab.id, { greeting: 'SetIntensity', intensity: nextIntensity }).catch(() => {});
+          await sendTabMessage(tab.id, { greeting: 'SetIntensity', intensity: nextIntensity });
         }
       } catch (e) {
         console.error('Failed to persist intensity:', e);
