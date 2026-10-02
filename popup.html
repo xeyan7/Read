@@ -9,14 +9,8 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="bg" aria-hidden="true">
-    <span class="orb orb-red"></span>
-    <span class="orb orb-violet"></span>
-    <span class="orb orb-teal"></span>
-  </div>
-
   <div class="shell">
-    <header class="glass header">
+    <header class="card header">
       <div class="brand">
         <span class="logo-ring"><img src="icons/logo.png" alt="Focus Reader" class="logo-img"></span>
         <span class="brand-text">
@@ -35,7 +29,7 @@
       </button>
     </header>
 
-    <section class="glass site" id="hostCard" aria-label="Current site">
+    <section class="card site" id="hostCard" aria-label="Current site">
       <span class="host-dot" id="statusDot"></span>
       <span class="site-text">
         <span class="site-label">This site</span>
@@ -77,7 +71,7 @@
       <p class="page-note" id="pageNote" style="display: none;" role="status"></p>
     </div>
 
-    <section class="glass weights" aria-label="Reading strength">
+    <section class="card weights" aria-label="Reading strength">
       <div class="row">
         <span class="label">Strength</span>
         <span class="value" id="dockVal">Medium (700)</span>
@@ -89,7 +83,7 @@
       </div>
     </section>
 
-    <section class="glass preview">
+    <section class="card preview">
       <div class="row">
         <span class="label">Preview · <span class="preview-state" id="previewState">Standard</span></span>
         <button id="cycleSampleBtn" class="cycle" type="button" title="Cycle sample sentence" aria-label="Cycle sample sentence">
