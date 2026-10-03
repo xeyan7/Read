@@ -123,7 +123,7 @@ async function initPopup() {
   }
 
   function renderIntensity() {
-    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[state.intensity] : 700;
+    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[state.intensity] : 600;
     const label = state.intensity.charAt(0).toUpperCase() + state.intensity.slice(1);
     if (dockVal) dockVal.textContent = `${label} (${weight})`;
     if (previewSample) previewSample.style.setProperty('--wb-weight', String(weight));

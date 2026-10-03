@@ -29,7 +29,7 @@ const FocusReader = {
 
   INTENSITIES: ['light', 'medium', 'strong'],
   DEFAULT_INTENSITY: 'medium',
-  INTENSITY_WEIGHTS: { light: 500, medium: 700, strong: 900 },
+  INTENSITY_WEIGHTS: { light: 500, medium: 600, strong: 800 },
 
   /* UI color themes: minimal monochrome dark (default) and light. */
   THEMES: ['dark', 'light'],

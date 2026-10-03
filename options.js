@@ -85,7 +85,7 @@ async function initOptions() {
       item.setAttribute('aria-checked', isMatch ? 'true' : 'false');
     });
 
-    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[currentIntensity] : 700;
+    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[currentIntensity] : 600;
     if (preview) {
       preview.style.setProperty('--wb-weight', String(weight));
     }

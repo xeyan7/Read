@@ -42,8 +42,8 @@
   --surface: #FFFFFF;
   --surface-2: #F1F1F1;
   --surface-hover: #FAFAFA;
-  --border: rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.18);
+  --border: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.22);
 
   --ink: #111111;
   --ink-2: #444444;
@@ -439,7 +439,7 @@ button:focus-visible {
 }
 
 .preview-sample.is-active .wb {
-  font-weight: var(--wb-weight, 700);
+  font-weight: var(--wb-weight, 600);
   color: var(--ink);
 }
 

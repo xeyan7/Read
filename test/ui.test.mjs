@@ -30,7 +30,7 @@ test('popup loads and renders quick intensity dock in active state', async () =>
   assert.equal(toggleBtn.getAttribute('aria-pressed'), 'true');
 
   const dockVal = page.document.getElementById('dockVal');
-  assert.equal(dockVal.textContent, 'Strong (900)');
+  assert.equal(dockVal.textContent, 'Strong (800)');
 
   // Verify clicking Light intensity button updates storage and UI
   const lightBtn = page.document.querySelector('.dock-seg-btn[data-intensity="light"]');
