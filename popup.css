@@ -46,16 +46,16 @@
   --border-strong: rgba(0, 0, 0, 0.18);
 
   --ink: #111111;
-  --ink-2: #555555;
-  --muted: #7A7A7A;
-  --faint: #B5B5B5;
+  --ink-2: #444444;
+  --muted: #686868;
+  --faint: #9C9C9C;
 
   --primary: #111111;
   --primary-ink: #FFFFFF;
 
   --accent: #1F8A57;
-  --dots: rgba(0, 0, 0, 0.08);
-  --dots-on: rgba(0, 0, 0, 0.26);
+  --dots: rgba(0, 0, 0, 0.14);
+  --dots-on: rgba(0, 0, 0, 0.38);
 }
 
 * {
@@ -425,6 +425,12 @@ button:focus-visible {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-ctrl);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+  min-height: calc(3.3em + 24px);
 }
 
 .preview-sample .wb {
@@ -441,7 +447,7 @@ button:focus-visible {
 .foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 2px 2px 0;
   font-size: 11px;
   color: var(--muted);

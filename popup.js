@@ -50,9 +50,9 @@ async function initPopup() {
 
   const SAMPLE_SENTENCES = [
     'Focus reader guides your eyes smoothly through long articles.',
-    'Bionic reading anchors your cognitive fixation on crucial syllable structures.',
-    'Complex technical documentation becomes effortlessly clear and rapid to scan.',
-    'The human visual cortex processes typographic guidance with remarkable velocity.',
+    'Bionic reading anchors words for faster scanning.',
+    'Dense documentation becomes clear and quick to scan.',
+    'Your visual cortex follows guided words with ease.',
   ];
   let sampleIndex = 0;
 
