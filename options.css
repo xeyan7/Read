@@ -438,6 +438,7 @@ select:focus-visible {
 
 /* ---------- Segmented ---------- */
 .segmented {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2px;
@@ -447,7 +448,23 @@ select:focus-visible {
   border-radius: var(--r-ctrl);
 }
 
+/* Sliding pill — glides under the active option instead of jumping */
+.seg-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  transition: transform 0.28s var(--ease), width 0.28s var(--ease);
+  pointer-events: none;
+}
+
 .seg-item {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -458,7 +475,7 @@ select:focus-visible {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition: color 0.15s;
 }
 
 .seg-item:hover {
@@ -467,8 +484,8 @@ select:focus-visible {
 
 .seg-item.is-selected {
   color: var(--ink);
-  background: var(--surface-2);
-  border-color: var(--border);
+  background: transparent;
+  border-color: transparent;
 }
 
 .seg-title {

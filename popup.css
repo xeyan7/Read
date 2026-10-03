@@ -381,6 +381,7 @@ button:focus-visible {
 
 /* ---------- Segmented control ---------- */
 .seg {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2px;
@@ -394,7 +395,23 @@ button:focus-visible {
   grid-template-columns: repeat(2, 1fr);
 }
 
+/* Sliding pill — glides under the active option instead of jumping */
+.seg-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  transition: transform 0.28s var(--ease), width 0.28s var(--ease);
+  pointer-events: none;
+}
+
 .dock-seg-btn {
+  position: relative;
+  z-index: 1;
   padding: 6px 4px;
   font-size: 12px;
   font-weight: 500;
@@ -403,7 +420,7 @@ button:focus-visible {
   border: 1px solid transparent;
   border-radius: var(--r-inner);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition: color 0.15s;
 }
 
 .dock-seg-btn:hover {
@@ -412,8 +429,8 @@ button:focus-visible {
 
 .dock-seg-btn.is-active {
   color: var(--ink);
-  background: var(--surface-2);
-  border-color: var(--border);
+  background: transparent;
+  border-color: transparent;
 }
 
 /* ---------- Preview ---------- */

@@ -48,11 +48,14 @@ async function initPopup() {
     mode: FocusReader ? FocusReader.DEFAULT_MODE : 'automatic',
   };
 
+  // Each sample is a fixed [line1, line2] pair: the break is locked with
+  // an explicit <br> so words-per-line stay identical on every strength.
+  // (Bolder text runs wider, which otherwise drags words across lines.)
   const SAMPLE_SENTENCES = [
-    'Focus reader guides your eyes smoothly through long articles.',
-    'Bionic reading anchors words for faster scanning.',
-    'Dense documentation becomes clear and quick to scan.',
-    'Your visual cortex follows guided words with ease.',
+    ['Focus reader guides your eyes', 'smoothly through long articles.'],
+    ['Bionic reading anchors each word', 'for faster, calmer scanning.'],
+    ['Dense pages turn clear and calm', 'for focused, faster reading.'],
+    ['Your visual cortex follows', 'guided words with ease.'],
   ];
   let sampleIndex = 0;
 
@@ -75,12 +78,41 @@ async function initPopup() {
       wheel.classList.toggle('is-active', show);
       wheel.setAttribute('aria-expanded', show ? 'true' : 'false');
     }
+    // Hidden panels have no layout — position thumbs once visible.
+    if (show) {
+      const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(fn, 16);
+      schedule(() => moveAllSegThumbs());
+    }
   }
 
   const toggleSettingsView = () => {
     const isShowingSettings = Boolean(viewSettings && viewSettings.style.display !== 'none');
     setSettingsView(!isShowingSettings);
   };
+
+  // Sliding segmented pill: glide a thumb under the active option.
+  function moveSegThumb(group) {
+    if (!group) return;
+    const kids = Array.from(group.children);
+    const thumb = kids.find((el) => el.classList && el.classList.contains('seg-thumb'));
+    const active = kids.find((el) => el.tagName === 'BUTTON' && el.classList.contains('is-active'));
+    if (!thumb || !active || typeof active.getBoundingClientRect !== 'function') return;
+    const gRect = group.getBoundingClientRect();
+    const bRect = active.getBoundingClientRect();
+    if (!bRect.width) return;
+    const first = !thumb.style.width;
+    if (first) thumb.style.transition = 'none';
+    thumb.style.width = `${bRect.width}px`;
+    thumb.style.transform = `translateX(${bRect.left - gRect.left}px)`;
+    if (first) {
+      void thumb.offsetWidth;
+      thumb.style.transition = '';
+    }
+  }
+
+  function moveAllSegThumbs() {
+    document.querySelectorAll('.seg').forEach(moveSegThumb);
+  }
 
   // Send a message to the tab, self-healing tabs whose content script is missing
   async function sendTabMessage(tabId, msg) {
@@ -101,24 +133,27 @@ async function initPopup() {
     }
   }
 
-  function updatePreviewSentence(sentence) {
+  function updatePreviewSentence(pair) {
     if (!previewSample) return;
     previewSample.innerHTML = '';
-    const words = sentence.split(/\s+/g);
-    words.forEach((word, idx) => {
-      if (idx > 0) previewSample.appendChild(document.createTextNode(' '));
-      const boldLen = FocusReader && FocusReader.calculateBoldLength
-        ? FocusReader.calculateBoldLength(word, state.fixation || 'optimal')
-        : Math.floor(word.length * (FocusReader ? FocusReader.BOLD_RATIO : 1 / 3));
-      if (boldLen >= 1) {
-        const span = document.createElement('span');
-        span.className = 'wb';
-        span.textContent = word.slice(0, boldLen);
-        previewSample.appendChild(span);
-        previewSample.appendChild(document.createTextNode(word.slice(boldLen)));
-      } else {
-        previewSample.appendChild(document.createTextNode(word));
-      }
+    const lines = Array.isArray(pair) ? pair : [pair];
+    lines.forEach((line, li) => {
+      if (li > 0) previewSample.appendChild(document.createElement('br'));
+      line.split(/\s+/g).forEach((word, idx) => {
+        if (idx > 0) previewSample.appendChild(document.createTextNode(' '));
+        const boldLen = FocusReader && FocusReader.calculateBoldLength
+          ? FocusReader.calculateBoldLength(word, state.fixation || 'optimal')
+          : Math.floor(word.length * (FocusReader ? FocusReader.BOLD_RATIO : 1 / 3));
+        if (boldLen >= 1) {
+          const span = document.createElement('span');
+          span.className = 'wb';
+          span.textContent = word.slice(0, boldLen);
+          previewSample.appendChild(span);
+          previewSample.appendChild(document.createTextNode(word.slice(boldLen)));
+        } else {
+          previewSample.appendChild(document.createTextNode(word));
+        }
+      });
     });
   }
 
@@ -133,6 +168,7 @@ async function initPopup() {
       btn.classList.toggle('is-active', match);
       btn.setAttribute('aria-checked', match ? 'true' : 'false');
     });
+    moveSegThumb(document.getElementById('popupIntensityGroup'));
   }
 
   function renderFixation() {
@@ -151,6 +187,7 @@ async function initPopup() {
         popupFixationVal.textContent = 'Optimal 45%';
       }
     }
+    moveSegThumb(document.getElementById('popupFixationGroup'));
   }
 
   function renderMode() {
@@ -163,6 +200,7 @@ async function initPopup() {
     if (settingsModeVal) {
       settingsModeVal.textContent = state.mode === 'manual' ? 'Manual' : 'Automatic';
     }
+    moveSegThumb(document.getElementById('popupModeGroup'));
   }
 
   function renderHostRule() {
@@ -393,6 +431,13 @@ async function initPopup() {
   renderFixation();
   renderMode();
   updatePreviewSentence(SAMPLE_SENTENCES[sampleIndex]);
+  moveAllSegThumbs();
+  window.addEventListener('resize', moveAllSegThumbs);
+  try {
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => moveAllSegThumbs());
+    }
+  } catch (_) {}
 
   // --- Resolve the Active Tab ---
   try {

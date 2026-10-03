@@ -76,6 +76,31 @@ async function initOptions() {
     if (metricAnchor) {
       metricAnchor.textContent = currentFixation === 'classic' ? '33%' : (currentFixation === 'high' ? '55%' : '~45%');
     }
+    moveSegThumb(document.getElementById('fixationGroup'));
+  }
+
+  // Sliding segmented pill: glide a thumb under the active option.
+  function moveSegThumb(group) {
+    if (!group) return;
+    const kids = Array.from(group.children);
+    const thumb = kids.find((el) => el.classList && el.classList.contains('seg-thumb'));
+    const active = kids.find((el) => el.tagName === 'BUTTON' && el.classList.contains('is-selected'));
+    if (!thumb || !active || typeof active.getBoundingClientRect !== 'function') return;
+    const gRect = group.getBoundingClientRect();
+    const bRect = active.getBoundingClientRect();
+    if (!bRect.width) return;
+    const first = !thumb.style.width;
+    if (first) thumb.style.transition = 'none';
+    thumb.style.width = `${bRect.width}px`;
+    thumb.style.transform = `translateX(${bRect.left - gRect.left}px)`;
+    if (first) {
+      void thumb.offsetWidth;
+      thumb.style.transition = '';
+    }
+  }
+
+  function moveAllSegThumbs() {
+    document.querySelectorAll('.segmented').forEach(moveSegThumb);
   }
 
   function renderIntensity() {
@@ -95,6 +120,7 @@ async function initOptions() {
     if (studioParagraph) {
       studioParagraph.style.setProperty('--wb-weight', String(weight));
     }
+    moveSegThumb(document.getElementById('intensityGroup'));
   }
 
   // --- Reading Studio Logic --------------------------------------------------
@@ -260,6 +286,13 @@ async function initOptions() {
   renderIntensity();
   renderFixation();
   renderStudio();
+  moveAllSegThumbs();
+  window.addEventListener('resize', moveAllSegThumbs);
+  try {
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => moveAllSegThumbs());
+    }
+  } catch (_) {}
   await loadSiteRules();
 
   // --- Mode changes ----------------------------------------------------------
