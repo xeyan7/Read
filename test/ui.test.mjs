@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPage, readSource, settle } from './helpers/env.mjs';
 
-test('popup loads and renders tab host and quick intensity dock', async () => {
+test('popup loads and renders quick intensity dock in active state', async () => {
   const html = readSource('popup.html');
   const page = createPage({
     html,
@@ -20,11 +20,10 @@ test('popup loads and renders tab host and quick intensity dock', async () => {
   page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
   await settle();
 
-  const hostName = page.document.getElementById('hostName');
-  assert.equal(hostName.textContent, 'news.ycombinator.com');
-
-  const hostBadge = page.document.getElementById('hostBadge');
-  assert.equal(hostBadge.textContent, 'ACTIVE');
+  // Host status card was removed — no per-site badge UI should remain.
+  assert.equal(page.document.getElementById('hostCard'), null);
+  assert.equal(page.document.getElementById('hostName'), null);
+  assert.equal(page.document.getElementById('hostBadge'), null);
 
   const toggleBtn = page.document.getElementById('toggleButton');
   assert.ok(toggleBtn.classList.contains('is-active'));
@@ -41,6 +40,52 @@ test('popup loads and renders tab host and quick intensity dock', async () => {
 
   assert.equal(page.mock.storage.intensity, 'light');
   assert.equal(dockVal.textContent, 'Light (500)');
+});
+
+test('popup defaults to always-active when tab is unreachable and no prefs exist', async () => {
+  const html = readSource('popup.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'popup.js'],
+    tabs: [{ id: 2, url: 'https://example.com/article' }],
+    storage: {},
+    onTabMessage: () => undefined,
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const toggleBtn = page.document.getElementById('toggleButton');
+  assert.ok(toggleBtn.classList.contains('is-active'));
+  assert.equal(toggleBtn.getAttribute('aria-pressed'), 'true');
+});
+
+test('popup theme toggle cycles dark and light', async () => {
+  const html = readSource('popup.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'popup.js'],
+    tabs: [{ id: 3, url: 'https://example.com' }],
+    storage: {},
+    onTabMessage: () => undefined,
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const themeToggle = page.document.getElementById('themeToggle');
+  assert.ok(themeToggle);
+  assert.equal(page.window.document.documentElement.dataset.theme, 'dark');
+
+  themeToggle.click();
+  await settle();
+  assert.equal(page.window.document.documentElement.dataset.theme, 'light');
+  assert.equal(page.mock.storage.theme, 'light');
+
+  themeToggle.click();
+  await settle();
+  assert.equal(page.window.document.documentElement.dataset.theme, 'dark');
+  assert.equal(page.mock.storage.theme, 'dark');
 });
 
 test('popup cycles sample sentences', async () => {
@@ -97,7 +142,7 @@ test('popup self-heals tabs missing the content script', async () => {
   assert.equal(toggleBtn.getAttribute('aria-pressed'), 'true');
 });
 
-test('options page manages activation modes and reading studio', async () => {
+test('options page defaults to automatic mode and manages reading studio', async () => {
   const html = readSource('options.html');
   const page = createPage({
     html,
@@ -133,6 +178,48 @@ test('options page manages activation modes and reading studio', async () => {
   await settle();
   assert.equal(toggleLabel.textContent, 'Standard Text');
   assert.equal(studioParagraph.querySelectorAll(`.${page.window.FocusReader.BOLD_CLASS}`).length, 0);
+});
+
+test('options page defaults to automatic mode when nothing is stored', async () => {
+  const html = readSource('options.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'options.js'],
+    storage: {},
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const modeAuto = page.document.getElementById('modeAutomatic');
+  assert.ok(modeAuto.classList.contains('is-selected'));
+});
+
+test('options appearance picker switches between dark and light themes', async () => {
+  const html = readSource('options.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'options.js'],
+    storage: {},
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const darkBtn = page.document.querySelector('[data-theme-option="dark"]');
+  const lightBtn = page.document.querySelector('[data-theme-option="light"]');
+  assert.ok(darkBtn);
+  assert.ok(lightBtn);
+  assert.equal(page.window.document.documentElement.dataset.theme, 'dark');
+  assert.ok(darkBtn.classList.contains('is-selected'));
+
+  lightBtn.click();
+  await settle();
+
+  assert.equal(page.window.document.documentElement.dataset.theme, 'light');
+  assert.equal(page.mock.storage.theme, 'light');
+  assert.ok(lightBtn.classList.contains('is-selected'));
+  assert.ok(!darkBtn.classList.contains('is-selected'));
 });
 
 test('options page manages custom site rules', async () => {
@@ -176,3 +263,102 @@ test('options page manages custom site rules', async () => {
 
   assert.equal(rulesList.children.length, 2);
 });
+
+test('options page manages fixation anchor density presets', async () => {
+  const html = readSource('options.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'options.js'],
+    storage: { fixation: 'optimal' },
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const optBtn = page.document.querySelector('[data-fixation="optimal"]');
+  const classicBtn = page.document.querySelector('[data-fixation="classic"]');
+  const metricAnchor = page.document.getElementById('metricAnchor');
+  assert.ok(optBtn);
+  assert.ok(optBtn.classList.contains('is-selected'));
+  assert.equal(metricAnchor.textContent, '~45%');
+
+  classicBtn.click();
+  await settle();
+
+  assert.equal(page.mock.storage.fixation, 'classic');
+  assert.ok(classicBtn.classList.contains('is-selected'));
+  assert.equal(metricAnchor.textContent, '33%');
+});
+
+test('popup settings gear opens preferences within extension and allows adjustments', async () => {
+  const html = readSource('popup.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'popup.js'],
+    tabs: [{ id: 10, url: 'https://news.ycombinator.com/item?id=42' }],
+    storage: { mode: 'automatic', fixation: 'optimal' },
+    onTabMessage: (_tabId, msg) => {
+      if (msg.greeting === 'isActive') return true;
+      return undefined;
+    },
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const viewMain = page.document.getElementById('viewMain');
+  const viewSettings = page.document.getElementById('viewSettings');
+  const settingsWheel = page.document.getElementById('settingsWheel');
+  const settingsBackBtn = page.document.getElementById('settingsBackBtn');
+
+  assert.ok(viewMain);
+  assert.ok(viewSettings);
+  assert.ok(settingsWheel);
+  assert.ok(settingsBackBtn);
+
+  // Initially main view is visible and settings is hidden
+  assert.notEqual(viewMain.style.display, 'none');
+  assert.equal(viewSettings.style.display, 'none');
+
+  // Click settings wheel: opens settings within the extension
+  settingsWheel.click();
+  await settle();
+
+  assert.equal(viewMain.style.display, 'none');
+  assert.equal(viewSettings.style.display, 'flex');
+  assert.ok(settingsWheel.classList.contains('is-active'));
+
+  // Test mode change within in-extension settings
+  const manualBtn = page.document.querySelector('#popupModeGroup .dock-seg-btn[data-mode="manual"]');
+  const modeVal = page.document.getElementById('settingsModeVal');
+  assert.ok(manualBtn);
+  manualBtn.click();
+  await settle();
+
+  assert.equal(page.mock.storage.mode, 'manual');
+  assert.equal(modeVal.textContent, 'Manual');
+
+  // Test fixation anchor change within in-extension settings
+  const highFixBtn = page.document.querySelector('#popupFixationGroup .dock-seg-btn[data-fixation="high"]');
+  const fixationVal = page.document.getElementById('popupFixationVal');
+  assert.ok(highFixBtn);
+  highFixBtn.click();
+  await settle();
+
+  assert.equal(page.mock.storage.fixation, 'high');
+  assert.equal(fixationVal.textContent, 'High 55%');
+
+  // Verify active tab host is displayed
+  const hostTag = page.document.getElementById('settingsHostTag');
+  assert.ok(hostTag);
+  assert.equal(hostTag.textContent, 'news.ycombinator.com');
+
+  // Click back button: returns to main reader view within the popup
+  settingsBackBtn.click();
+  await settle();
+
+  assert.equal(viewMain.style.display, 'flex');
+  assert.equal(viewSettings.style.display, 'none');
+  assert.ok(!settingsWheel.classList.contains('is-active'));
+});
+

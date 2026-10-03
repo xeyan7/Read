@@ -2,8 +2,8 @@
  *
  * Responsibilities:
  *  - Keep tabs in sync when mode switches between 'manual' and 'automatic'.
- *  - Set badge text to 'off' with background color #725a57 when deactivated on a site,
- *    and clear badge when activated.
+ *  - Set badge text to 'off' with neutral slate (#4B5563) background when
+ *    deactivated on a site, and clear badge when activated.
  */
 
 'use strict';
@@ -18,7 +18,7 @@ const isWebTab = (tab) => Boolean(tab && tab.url && tab.url.startsWith('http'));
 
 async function currentMode() {
   const { mode } = await chrome.storage.sync.get(['mode']);
-  return mode === 'automatic' ? 'automatic' : 'manual';
+  return mode === 'manual' ? 'manual' : 'automatic';
 }
 
 async function sendToTab(tabId, greeting) {
@@ -39,12 +39,12 @@ async function sendToTab(tabId, greeting) {
   }
 }
 
-/** Set badge text matching E:Read ("off" with cool slate background, or empty) */
+/** Set badge text ("off" with neutral slate background, or empty) */
 async function syncBadge(tabId, text) {
   try {
     await chrome.action.setBadgeText({ text, tabId });
     if (text === 'off') {
-      await chrome.action.setBadgeBackgroundColor({ color: '#5b6472', tabId });
+      await chrome.action.setBadgeBackgroundColor({ color: '#4B5563', tabId });
     }
   } catch (_) {}
 }
@@ -95,7 +95,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       await syncBadge(tabId, 'off');
     } else {
       const { mode } = await chrome.storage.sync.get(['mode']);
-      if (mode === 'automatic') {
+      if (mode !== 'manual') {
         await syncBadge(tabId, '');
       }
     }
@@ -105,6 +105,13 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 chrome.runtime.onInstalled.addListener(async () => {
   try {
     await chrome.action.enable();
+  } catch (_) {}
+  // Default to always-active on all sites for fresh installs.
+  try {
+    const { mode } = await chrome.storage.sync.get(['mode']);
+    if (mode === undefined) {
+      await chrome.storage.sync.set({ mode: 'automatic' });
+    }
   } catch (_) {}
   // Enforce red book icon everywhere (toolbar + store listings use manifest,
   // this guarantees the runtime toolbar icon too).

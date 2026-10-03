@@ -13,7 +13,8 @@ async function initOptions() {
   const autoCard = document.getElementById('modeAutomatic');
   const statusBar = document.getElementById('statusBar');
   const statusText = document.getElementById('statusText');
-  const segItems = Array.from(document.querySelectorAll('.seg-item'));
+  const segItems = Array.from(document.querySelectorAll('#intensityGroup .seg-item'));
+  const fixationItems = Array.from(document.querySelectorAll('#fixationGroup .seg-item'));
   const preview = document.getElementById('intensityPreview');
   const previewWeightBadge = document.getElementById('previewWeightBadge');
 
@@ -23,6 +24,7 @@ async function initOptions() {
   const studioToggleLabel = document.getElementById('studioToggleLabel');
   const topicChips = Array.from(document.querySelectorAll('.topic-chip'));
   const metricWpm = document.getElementById('metricWpm');
+  const metricAnchor = document.getElementById('metricAnchor');
 
   // Rules Elements
   const siteRulesList = document.getElementById('siteRulesList');
@@ -32,8 +34,9 @@ async function initOptions() {
   const newRuleAction = document.getElementById('newRuleAction');
 
   const modeCards = [manualCard, autoCard].filter(Boolean);
-  let currentMode = 'manual';
+  let currentMode = FocusReader ? FocusReader.DEFAULT_MODE : 'automatic';
   let currentIntensity = FocusReader ? FocusReader.DEFAULT_INTENSITY : 'medium';
+  let currentFixation = FocusReader ? FocusReader.DEFAULT_FIXATION : 'optimal';
   let studioBionicActive = true;
   let currentTopic = 'science';
 
@@ -62,6 +65,17 @@ async function initOptions() {
       card.classList.toggle('is-selected', isMatch);
       card.setAttribute('aria-checked', isMatch ? 'true' : 'false');
     });
+  }
+
+  function renderFixation() {
+    fixationItems.forEach((item) => {
+      const isMatch = item.dataset.fixation === currentFixation;
+      item.classList.toggle('is-selected', isMatch);
+      item.setAttribute('aria-checked', isMatch ? 'true' : 'false');
+    });
+    if (metricAnchor) {
+      metricAnchor.textContent = currentFixation === 'classic' ? '33%' : (currentFixation === 'high' ? '55%' : '~45%');
+    }
   }
 
   function renderIntensity() {
@@ -99,7 +113,9 @@ async function initOptions() {
     const words = rawText.split(/\s+/g);
     words.forEach((word, idx) => {
       if (idx > 0) studioParagraph.appendChild(document.createTextNode(' '));
-      const boldLen = Math.floor(word.length * (FocusReader ? FocusReader.BOLD_RATIO : 1 / 3));
+      const boldLen = FocusReader && FocusReader.calculateBoldLength
+        ? FocusReader.calculateBoldLength(word, currentFixation)
+        : Math.floor(word.length * (FocusReader ? FocusReader.BOLD_RATIO : 1 / 3));
       if (boldLen >= 1) {
         const span = document.createElement('span');
         span.className = FocusReader ? FocusReader.BOLD_CLASS : 'focus-reader-bold';
@@ -144,7 +160,7 @@ async function initOptions() {
 
     try {
       const allStorage = await chrome.storage.sync.get(null);
-      const systemKeys = new Set(['mode', 'intensity']);
+      const systemKeys = new Set(['mode', 'intensity', 'theme']);
       const hostRules = Object.entries(allStorage || {}).filter(
         ([key, val]) => !systemKeys.has(key) && typeof val === 'boolean'
       );
@@ -169,7 +185,7 @@ async function initOptions() {
 
         const statusBadge = document.createElement('span');
         statusBadge.className = `rule-status-badge ${isEnabled ? 'rule-badge-on' : 'rule-badge-off'}`;
-        statusBadge.textContent = isEnabled ? 'Always Active' : 'Always Disabled';
+        statusBadge.textContent = isEnabled ? 'Always on' : 'Always off';
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
@@ -226,12 +242,15 @@ async function initOptions() {
     });
   }
 
-  // --- Load saved preferences ------------------------------------------------
+  // --- Load saved preferences (default: always-active on all sites) -----------
   try {
-    const res = await chrome.storage.sync.get(['mode', 'intensity']);
-    if (res && res.mode === 'automatic') currentMode = 'automatic';
+    const res = await chrome.storage.sync.get(['mode', 'intensity', 'fixation']);
+    currentMode = FocusReader ? FocusReader.normalizeMode(res && res.mode) : (res && res.mode === 'manual' ? 'manual' : 'automatic');
     if (res && res.intensity !== undefined) {
       currentIntensity = FocusReader ? FocusReader.normalizeIntensity(res.intensity) : res.intensity;
+    }
+    if (res && res.fixation !== undefined && FocusReader && FocusReader.normalizeFixation) {
+      currentFixation = FocusReader.normalizeFixation(res.fixation);
     }
   } catch (err) {
     console.warn('Could not read storage:', err);
@@ -239,6 +258,7 @@ async function initOptions() {
 
   renderMode();
   renderIntensity();
+  renderFixation();
   renderStudio();
   await loadSiteRules();
 
@@ -291,28 +311,76 @@ async function initOptions() {
     });
   });
 
-  // --- Theme Toggle Handling -------------------------------------------------
+  // --- Fixation changes ------------------------------------------------------
+  async function selectFixation(fixation) {
+    if (fixation === currentFixation) return;
+    currentFixation = FocusReader && FocusReader.normalizeFixation ? FocusReader.normalizeFixation(fixation) : fixation;
+    renderFixation();
+    renderStudio();
+    flash(`Anchor density set to ${currentFixation}`);
+    try {
+      await chrome.storage.sync.set({ fixation: currentFixation });
+    } catch (err) {
+      console.error('Failed to save fixation:', err);
+      if (statusText) statusText.textContent = 'Failed to save preference.';
+    }
+  }
+
+  fixationItems.forEach((item) => {
+    item.addEventListener('click', () => selectFixation(item.dataset.fixation));
+    item.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        selectFixation(item.dataset.fixation);
+      }
+    });
+  });
+
+  // --- Theme Handling (dark / light) -----------------------------------------
   const themeToggle = document.getElementById('themeToggle');
+  const themeOptions = Array.from(document.querySelectorAll('[data-theme-option]'));
+  const themeOrder = FocusReader && FocusReader.THEMES ? FocusReader.THEMES : ['dark', 'light'];
+
+  function renderThemePicker(activeTheme) {
+    themeOptions.forEach((btn) => {
+      const isMatch = btn.dataset.themeOption === activeTheme;
+      btn.classList.toggle('is-selected', isMatch);
+      btn.setAttribute('aria-checked', isMatch ? 'true' : 'false');
+    });
+  }
+
+  async function applyTheme(nextTheme, { silent = false } = {}) {
+    const theme = FocusReader ? FocusReader.normalizeTheme(nextTheme) : nextTheme;
+    document.documentElement.dataset.theme = theme;
+    renderThemePicker(theme);
+    if (!silent) flash(`Theme set to ${theme}`);
+    try {
+      await chrome.storage.sync.set({ theme });
+    } catch (err) {
+      console.warn('Could not persist theme:', err);
+    }
+  }
+
   try {
     const { theme } = await chrome.storage.sync.get(['theme']);
-    if (theme) {
-      document.documentElement.dataset.theme = theme;
-    }
+    const initial = FocusReader ? FocusReader.normalizeTheme(theme) : (theme || 'dark');
+    document.documentElement.dataset.theme = initial;
+    renderThemePicker(initial);
   } catch (_) {}
 
   if (themeToggle) {
     themeToggle.addEventListener('click', async () => {
-      const isDark = document.documentElement.dataset.theme === 'dark';
-      const nextTheme = isDark ? 'light' : 'dark';
-      document.documentElement.dataset.theme = nextTheme;
-      flash(`Theme set to ${nextTheme} mode`);
-      try {
-        await chrome.storage.sync.set({ theme: nextTheme });
-      } catch (err) {
-        console.warn('Could not persist theme:', err);
-      }
+      const current = document.documentElement.dataset.theme || 'dark';
+      const nextTheme = themeOrder[(themeOrder.indexOf(current) + 1) % themeOrder.length];
+      await applyTheme(nextTheme);
     });
   }
+
+  themeOptions.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      await applyTheme(btn.dataset.themeOption);
+    });
+  });
 }
 
 if (document.readyState === 'loading') {
