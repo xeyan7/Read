@@ -1,51 +1,94 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Focus Reader — Settings</title>
+  <title>Read Fast - ADHD · Preferences</title>
   <link rel="icon" type="image/png" sizes="32x32" href="icons/logo-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="icons/logo-16.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <div class="shell">
+    <!-- Studio Header / Hero Banner -->
     <header class="card hero">
-      <span class="logo-ring"><img src="icons/logo.png" alt="Focus Reader" class="logo-img"></span>
-      <div class="hero-text">
-        <span class="eyebrow">Focus Reader · v1.0</span>
-        <h1 class="title">Reading settings</h1>
-        <p class="subtitle">One tap to read faster. Pick when it turns on, how strong it feels, and which sites it remembers.</p>
+      <div class="hero-left">
+        <div class="logo-box">
+          <img src="icons/logo.png" alt="Read Fast - ADHD" class="logo-img">
+        </div>
+        <div class="hero-text">
+          <div class="eyebrow">Cognitive Typography · v1.2</div>
+          <h1 class="title">Reading Preferences</h1>
+          <p class="subtitle">Fine-tune visual anchoring pace, default behaviors, and site-specific exceptions.</p>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button id="themeToggle" class="theme-pill-btn" title="Toggle light / dark mode" aria-label="Toggle theme">
+          <svg class="theme-icon-light" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <svg class="theme-icon-dark" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <span class="theme-label">Theme</span>
+        </button>
+        <div class="hero-badge">
+          <span class="badge-dot"></span>
+          <span>100% On-Device</span>
+        </div>
       </div>
     </header>
 
     <div class="stack">
+      <!-- Section 1: Activation Mode -->
       <section class="card" aria-labelledby="headingActivation">
-        <span class="kicker">1 · When it runs</span>
-        <h2 class="card-title" id="headingActivation">Turn on automatically?</h2>
-        <p class="card-sub">Manual means you tap the button. Automatic means every article just reads easier.</p>
+        <div class="card-header">
+          <span class="kicker">Execution Mode</span>
+          <h2 class="card-title" id="headingActivation">Activation Behavior</h2>
+          <p class="card-sub">Choose whether reading anchors apply automatically across all pages or require manual activation.</p>
+        </div>
         <div class="mode-group" role="radiogroup" aria-label="Default activation mode">
-          <div class="mode-item" id="modeManual" data-mode="manual" role="radio" aria-checked="true" tabindex="0">
+          <div class="mode-item is-selected" id="modeManual" data-mode="manual" role="radio" aria-checked="true" tabindex="0">
             <span class="radio-shell"><span class="radio-dot"></span></span>
-            <span class="mode-text">
-              <span class="mode-head"><span class="mode-title">Manual</span><span class="tag tag-hot">Recommended</span></span>
-              <span class="mode-desc">Pages stay untouched until you tap Activate.</span>
-            </span>
+            <div class="mode-text">
+              <div class="mode-head">
+                <span class="mode-title">Manual Activation</span>
+                <span class="tag tag-hot">Recommended</span>
+              </div>
+              <p class="mode-desc">Web pages remain untouched until you tap Activate from the toolbar popup.</p>
+            </div>
           </div>
           <div class="mode-item" id="modeAutomatic" data-mode="automatic" role="radio" aria-checked="false" tabindex="0">
             <span class="radio-shell"><span class="radio-dot"></span></span>
-            <span class="mode-text">
-              <span class="mode-head"><span class="mode-title">Automatic</span><span class="tag">Full auto</span></span>
-              <span class="mode-desc">Every site gets bionic reading unless you switch it off.</span>
-            </span>
+            <div class="mode-text">
+              <div class="mode-head">
+                <span class="mode-title">Automatic Flow</span>
+                <span class="tag">Auto-Pilot</span>
+              </div>
+              <p class="mode-desc">Bionic anchors activate automatically on articles and web pages as they load.</p>
+            </div>
           </div>
         </div>
       </section>
 
+      <!-- Section 2: Reading Strength & Calibration -->
       <section class="card" aria-labelledby="headingIntensity">
-        <span class="kicker">2 · How strong</span>
-        <h2 class="card-title" id="headingIntensity">Reading strength</h2>
-        <p class="card-sub">How heavy the starting letters feel. Changes apply instantly.</p>
+        <div class="card-header">
+          <span class="kicker">Typographic Weight</span>
+          <h2 class="card-title" id="headingIntensity">Anchor Strength</h2>
+          <p class="card-sub">Calibrate the visual emphasis applied to the initial letters of each word.</p>
+        </div>
         <div class="segmented" id="intensityGroup" role="radiogroup" aria-label="Bold intensity">
           <button type="button" class="seg-item" data-intensity="light" role="radio" aria-checked="false">
             <span class="seg-title">Light</span>
@@ -62,7 +105,7 @@
         </div>
         <div class="preview-box">
           <div class="preview-box-header">
-            <span class="preview-label">Preview</span>
+            <span class="preview-label">Live Weight Preview</span>
             <span class="preview-badge" id="previewWeightBadge">Weight 700</span>
           </div>
           <p class="preview-sample" id="intensityPreview">
@@ -71,12 +114,13 @@
         </div>
       </section>
 
+      <!-- Section 3: Cognitive Reading Studio -->
       <section class="card" aria-labelledby="headingStudio">
-        <span class="kicker">3 · Try it</span>
-        <div class="studio-head">
+        <div class="card-header studio-head">
           <div>
-            <h2 class="card-title" id="headingStudio">Reading studio</h2>
-            <p class="card-sub">Feel the difference across real passages.</p>
+            <span class="kicker">Interactive Laboratory</span>
+            <h2 class="card-title" id="headingStudio">Reading Studio</h2>
+            <p class="card-sub">Experience and compare the cognitive difference across diverse reading genres.</p>
           </div>
           <button type="button" id="studioToggleBtn" class="studio-btn studio-btn-primary" aria-pressed="true">
             <span class="studio-btn-dot"></span>
@@ -95,28 +139,31 @@
         <div class="studio-metrics">
           <div class="metric-cell">
             <span class="metric-val">33%</span>
-            <span class="metric-key">Anchor</span>
+            <span class="metric-key">Saccadic Anchor</span>
           </div>
           <div class="metric-divider"></div>
           <div class="metric-cell">
             <span class="metric-val" id="metricWpm">~340</span>
-            <span class="metric-key">WPM pace</span>
+            <span class="metric-key">Estimated WPM</span>
           </div>
           <div class="metric-divider"></div>
           <div class="metric-cell">
             <span class="metric-val">100%</span>
-            <span class="metric-key">Private</span>
+            <span class="metric-key">Local Computation</span>
           </div>
         </div>
       </section>
 
+      <!-- Section 4: Per-Site Rules & Exceptions -->
       <section class="card" aria-labelledby="headingRules">
-        <span class="kicker">4 · Your sites</span>
-        <h2 class="card-title" id="headingRules">Site rules</h2>
-        <p class="card-sub">Sites you switched on or off from the popup live here.</p>
+        <div class="card-header">
+          <span class="kicker">Host Overrides</span>
+          <h2 class="card-title" id="headingRules">Custom Site Rules</h2>
+          <p class="card-sub">Domains where you have customized behavior from the popup are stored here.</p>
+        </div>
         <form id="addRuleForm" class="rule-add-bar">
           <div class="input-wrap">
-            <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10"/>
               <line x1="2" y1="12" x2="22" y2="12"/>
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
@@ -124,28 +171,29 @@
             <input type="text" id="newRuleHost" class="rule-input" placeholder="e.g. nytimes.com" autocomplete="off" spellcheck="false" required>
           </div>
           <select id="newRuleAction" class="rule-select" aria-label="Rule Behavior">
-            <option value="true">Always on</option>
-            <option value="false">Always off</option>
+            <option value="true">Always Active</option>
+            <option value="false">Always Disabled</option>
           </select>
-          <button type="submit" class="rule-add-btn">Add</button>
+          <button type="submit" class="rule-add-btn">Add Rule</button>
         </form>
         <div class="rules-list-container">
           <div id="siteRulesList" class="site-rules-list"></div>
           <div id="siteRulesEmpty" class="rules-empty-state" style="display: none;">
             <div class="empty-icon-capsule">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="8" x2="12" y2="12"/>
                 <line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
             </div>
-            <p class="empty-title">No site rules yet</p>
-            <p class="empty-sub">Toggle Focus Reader on any site and it will show up here.</p>
+            <p class="empty-title">No custom site rules</p>
+            <p class="empty-sub">Toggle Read Fast on any website to automatically record your preference here.</p>
           </div>
         </div>
       </section>
     </div>
 
+    <!-- Floating Sync Status Toast -->
     <div class="status-bar" id="statusBar" role="status">
       <span class="status-icon" aria-hidden="true">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -155,9 +203,13 @@
       <span class="status-text" id="statusText">Preferences synced</span>
     </div>
 
-    <footer class="card foot">
-      <span class="footer-badge">Private by design</span>
-      <p class="footer-hint">Everything happens on your device. No reading data ever leaves your browser.</p>
+    <!-- Studio Footer -->
+    <footer class="foot">
+      <span class="footer-badge">
+        <span class="badge-dot"></span>
+        <span>Private by design</span>
+      </span>
+      <p class="footer-hint">All typographic processing and site preferences reside strictly on your device.</p>
     </footer>
   </div>
 

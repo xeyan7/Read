@@ -1,4 +1,4 @@
-/* popup.js — E:read toolbar popup.
+/* popup.js — Read Fast - ADHD toolbar popup.
  * Binds the tactile popup UI to the live bionic-reading state of the active tab,
  * provides instant intensity adjustment, and enables sample text exploration.
  */
@@ -130,7 +130,7 @@ async function initPopup() {
 
   function showReady() {
     if (spinner) spinner.style.display = 'none';
-    if (toggleBtn) toggleBtn.style.display = 'block';
+    if (toggleBtn) toggleBtn.style.display = 'flex';
   }
 
   // --- Resolve the active tab -------------------------------------------------
@@ -157,7 +157,7 @@ async function initPopup() {
     if (hostName) hostName.textContent = 'No active tab';
     if (hostBadge) hostBadge.textContent = 'N/A';
     if (toggleBtn) toggleBtn.disabled = true;
-    setNote('Open a web page to use E:read.');
+    setNote('Open a web page to use Read Fast - ADHD.');
     render();
     showReady();
     return;
@@ -168,7 +168,7 @@ async function initPopup() {
     if (hostName) hostName.textContent = 'System page';
     if (hostBadge) hostBadge.textContent = 'N/A';
     if (toggleBtn) toggleBtn.disabled = true;
-    setNote('E:read only runs on http(s) web pages.');
+    setNote('Read Fast - ADHD only runs on http(s) web pages.');
     render();
     showReady();
     return;
@@ -286,6 +286,28 @@ async function initPopup() {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         openSettings();
+      }
+    });
+  }
+
+  // --- Theme Toggle Handling -------------------------------------------------
+  const themeToggle = $('themeToggle');
+  try {
+    const { theme } = await chrome.storage.sync.get(['theme']);
+    if (theme) {
+      document.documentElement.dataset.theme = theme;
+    }
+  } catch (_) {}
+
+  if (themeToggle) {
+    themeToggle.addEventListener('click', async () => {
+      const isDark = document.documentElement.dataset.theme === 'dark';
+      const nextTheme = isDark ? 'light' : 'dark';
+      document.documentElement.dataset.theme = nextTheme;
+      try {
+        await chrome.storage.sync.set({ theme: nextTheme });
+      } catch (err) {
+        console.warn('Could not persist theme:', err);
       }
     });
   }

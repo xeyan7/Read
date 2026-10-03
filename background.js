@@ -39,12 +39,12 @@ async function sendToTab(tabId, greeting) {
   }
 }
 
-/** Set badge text matching E:Read ("off" with #725a57 background, or empty) */
+/** Set badge text matching E:Read ("off" with cool slate background, or empty) */
 async function syncBadge(tabId, text) {
   try {
     await chrome.action.setBadgeText({ text, tabId });
     if (text === 'off') {
-      await chrome.action.setBadgeBackgroundColor({ color: '#725a57', tabId });
+      await chrome.action.setBadgeBackgroundColor({ color: '#5b6472', tabId });
     }
   } catch (_) {}
 }
