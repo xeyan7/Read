@@ -469,13 +469,15 @@ button:focus-visible {
 
 .preview-sample .wb {
   font-weight: 400;
-  transition: font-weight 0.4s var(--ease), color 0.2s;
+  text-shadow: 0 0 0 transparent;
+  transition: font-weight 0.5s var(--ease), text-shadow 0.5s var(--ease), color 0.2s;
 }
 
 .preview-sample.is-active .wb {
-  font-weight: var(--wb-weight, 600);
+  font-weight: var(--wb-weight, 700);
   color: var(--ink);
-  transition: font-weight 0.4s var(--ease), color 0.2s;
+  text-shadow: 0 0 0 var(--wb-boost, transparent);
+  transition: font-weight 0.5s var(--ease), text-shadow 0.5s var(--ease), color 0.2s;
 }
 
 /* ---------- Footer ---------- */
@@ -556,64 +558,144 @@ button:focus-visible {
   font-weight: 600;
 }
 
-.site-tag {
-  font-family: var(--mono);
-  font-size: 11px;
-  max-width: 180px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--surface-2);
+/* ---------- Site rules ---------- */
+.rules {
   border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
+  overflow: hidden;
+}
+
+.rules-list:empty {
+  display: none;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 8px 8px 12px;
+}
+
+.rule-row + .rule-row {
+  border-top: 1px solid var(--border);
+}
+
+.rule-domain {
+  font-family: var(--mono);
+  font-size: 11.5px;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.ghost-btn {
-  flex-shrink: 0;
-  font-size: 11.5px;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: var(--r-inner);
-  border: 1px solid var(--border-strong);
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.ghost-btn:hover {
-  background: var(--surface-2);
-}
-
-.list-btn {
+.rule-meta-group {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.rule-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.rule-status-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.rule-badge-on::before {
+  background: var(--accent);
+}
+
+.rule-badge-off::before {
+  background: var(--faint);
+}
+
+.rule-del-btn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-inner);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
   cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rule-del-btn:hover {
+  color: var(--danger, #E5848A);
+  border-color: var(--border);
+}
+
+.rules-empty {
+  margin: 0;
+  padding: 14px 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.rule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-ctrl);
   transition: border-color 0.15s;
 }
 
-.list-btn svg {
-  color: var(--muted);
-  transition: transform 0.2s var(--ease), color 0.15s;
+.input::placeholder {
+  color: var(--faint);
 }
 
-.list-btn:hover {
+.input:hover {
   border-color: var(--border-strong);
 }
 
-.list-btn:hover svg {
-  color: var(--ink);
-  transform: translate(1px, -1px);
+.input:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.rule-form .btn-primary {
+  width: 100%;
+}
+
+.btn-primary {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--r-ctrl);
+  background: var(--primary);
+  color: var(--primary-ink);
+  cursor: pointer;
+  transition: transform 0.15s var(--ease);
+}
+
+.btn-primary:active {
+  transform: scale(0.97);
 }
 
 @media (prefers-reduced-motion: reduce) {

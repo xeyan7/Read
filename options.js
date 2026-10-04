@@ -110,15 +110,18 @@ async function initOptions() {
       item.setAttribute('aria-checked', isMatch ? 'true' : 'false');
     });
 
-    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[currentIntensity] : 600;
+    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[currentIntensity] : 700;
+    const boost = FocusReader && FocusReader.boostFor ? FocusReader.boostFor(currentIntensity) : 'transparent';
     if (preview) {
       preview.style.setProperty('--wb-weight', String(weight));
+      preview.style.setProperty('--wb-boost', boost);
     }
     if (previewWeightBadge) {
       previewWeightBadge.textContent = `Weight ${weight}`;
     }
     if (studioParagraph) {
       studioParagraph.style.setProperty('--wb-weight', String(weight));
+      studioParagraph.style.setProperty('--wb-boost', boost);
     }
     moveSegThumb(document.getElementById('intensityGroup'));
   }

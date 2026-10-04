@@ -29,7 +29,16 @@ const FocusReader = {
 
   INTENSITIES: ['light', 'medium', 'strong'],
   DEFAULT_INTENSITY: 'medium',
-  INTENSITY_WEIGHTS: { light: 500, medium: 600, strong: 800 },
+  INTENSITY_WEIGHTS: { light: 500, medium: 700, strong: 900 },
+
+  /* Faux-bold boost per strength: a zero-blur text-shadow whose alpha ramps
+   * with intensity. Unlike font-weight (discrete faces on system fonts), shadow
+   * color interpolates continuously, so strength switches visibly morph. */
+  INTENSITY_BOOST: {
+    light: 'transparent',
+    medium: 'color-mix(in srgb, currentColor 25%, transparent)',
+    strong: 'color-mix(in srgb, currentColor 45%, transparent)',
+  },
 
   /* UI color themes: minimal monochrome dark (default) and light. */
   THEMES: ['dark', 'light'],
@@ -128,6 +137,12 @@ const FocusReader = {
   styleRuleFor(intensity) {
     const weight = FocusReader.INTENSITY_WEIGHTS[FocusReader.normalizeIntensity(intensity)];
     return `.${FocusReader.BOLD_CLASS}, .${FocusReader.LEGACY_BOLD_CLASS} { font-weight: ${weight}; transition: font-weight 0.4s cubic-bezier(0.16, 1, 0.3, 1); }`;
+  },
+
+  /** Zero-blur text-shadow boost for a strength (transparent when unknown). */
+  boostFor(intensity) {
+    const map = FocusReader.INTENSITY_BOOST || {};
+    return map[FocusReader.normalizeIntensity(intensity)] || 'transparent';
   },
 
   /** Back-compat accessor for the default rule. */

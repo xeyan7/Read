@@ -30,7 +30,7 @@ test('popup loads and renders quick intensity dock in active state', async () =>
   assert.equal(toggleBtn.getAttribute('aria-pressed'), 'true');
 
   const dockVal = page.document.getElementById('dockVal');
-  assert.equal(dockVal.textContent, 'Strong (800)');
+  assert.equal(dockVal.textContent, 'Strong (900)');
 
   // Verify clicking Light intensity button updates storage and UI
   const lightBtn = page.document.querySelector('.dock-seg-btn[data-intensity="light"]');
@@ -296,7 +296,12 @@ test('popup settings gear opens preferences within extension and allows adjustme
     html,
     scripts: ['shared.js', 'popup.js'],
     tabs: [{ id: 10, url: 'https://news.ycombinator.com/item?id=42' }],
-    storage: { mode: 'automatic', fixation: 'optimal' },
+    storage: {
+      mode: 'automatic',
+      fixation: 'optimal',
+      'wikipedia.org': true,
+      'reddit.com': false,
+    },
     onTabMessage: (_tabId, msg) => {
       if (msg.greeting === 'isActive') return true;
       return undefined;
@@ -328,7 +333,48 @@ test('popup settings gear opens preferences within extension and allows adjustme
   assert.equal(viewSettings.style.display, 'flex');
   assert.ok(settingsWheel.classList.contains('is-active'));
 
-  // Test mode change within in-extension settings
+  // Density controls were removed from settings — only activation remains.
+  assert.equal(page.document.getElementById('popupFixationGroup'), null);
+  assert.equal(page.document.getElementById('popupFixationVal'), null);
+
+  // All-preferences link was removed — every setting lives inside the popup.
+  assert.equal(page.document.getElementById('openFullOptionsBtn'), null);
+
+  // Automatic mode shows the exclusion list (everything bolds except these).
+  const rulesList = page.document.getElementById('siteRulesList');
+  const rulesCount = page.document.getElementById('siteRulesCount');
+  const rulesTitle = page.document.getElementById('siteRulesTitle');
+  const addBtn = page.document.getElementById('addRuleBtn');
+  assert.ok(rulesList);
+  assert.equal(rulesTitle.textContent, 'Excluded sites');
+  assert.equal(addBtn.textContent, 'Exclude');
+  assert.equal(rulesList.children.length, 1);
+  assert.equal(rulesList.children[0].querySelector('.rule-domain').textContent, 'reddit.com');
+  assert.equal(rulesCount.textContent, '1');
+
+  // Adding in automatic mode excludes the site.
+  const newRuleHost = page.document.getElementById('newRuleHost');
+  const addForm = page.document.getElementById('addRuleForm');
+  assert.ok(newRuleHost);
+  assert.ok(addForm);
+  newRuleHost.value = 'https://example.com/path';
+  addForm.dispatchEvent(new page.window.Event('submit', { bubbles: true, cancelable: true }));
+  await settle();
+
+  assert.equal(page.mock.storage['example.com'], false);
+  assert.equal(rulesList.children.length, 2);
+  assert.equal(rulesCount.textContent, '2');
+
+  // Delete an exclusion from the in-popup list.
+  const firstDelBtn = rulesList.querySelector('.rule-del-btn');
+  assert.ok(firstDelBtn);
+  firstDelBtn.click();
+  await settle();
+
+  assert.equal(rulesList.children.length, 1);
+  assert.equal(rulesCount.textContent, '1');
+
+  // Manual mode flips the list to inclusions (only these sites bold).
   const manualBtn = page.document.querySelector('#popupModeGroup .dock-seg-btn[data-mode="manual"]');
   const modeVal = page.document.getElementById('settingsModeVal');
   assert.ok(manualBtn);
@@ -337,21 +383,25 @@ test('popup settings gear opens preferences within extension and allows adjustme
 
   assert.equal(page.mock.storage.mode, 'manual');
   assert.equal(modeVal.textContent, 'Manual');
+  assert.equal(rulesTitle.textContent, 'Included sites');
+  assert.equal(addBtn.textContent, 'Include');
+  assert.equal(rulesList.children.length, 1);
+  assert.equal(rulesList.children[0].querySelector('.rule-domain').textContent, 'wikipedia.org');
+  assert.equal(rulesCount.textContent, '1');
 
-  // Test fixation anchor change within in-extension settings
-  const highFixBtn = page.document.querySelector('#popupFixationGroup .dock-seg-btn[data-fixation="high"]');
-  const fixationVal = page.document.getElementById('popupFixationVal');
-  assert.ok(highFixBtn);
-  highFixBtn.click();
+  // Adding in manual mode includes the site.
+  newRuleHost.value = 'mysite.com';
+  addForm.dispatchEvent(new page.window.Event('submit', { bubbles: true, cancelable: true }));
   await settle();
 
-  assert.equal(page.mock.storage.fixation, 'high');
-  assert.equal(fixationVal.textContent, 'High 55%');
+  assert.equal(page.mock.storage['mysite.com'], true);
+  assert.equal(rulesList.children.length, 2);
+  assert.equal(rulesCount.textContent, '2');
 
-  // Verify active tab host is displayed
-  const hostTag = page.document.getElementById('settingsHostTag');
-  assert.ok(hostTag);
-  assert.equal(hostTag.textContent, 'news.ycombinator.com');
+  // Current-site card was removed — per-site state lives in Site rules.
+  assert.equal(page.document.getElementById('settingsHostTag'), null);
+  assert.equal(page.document.getElementById('settingsHostHint'), null);
+  assert.equal(page.document.getElementById('settingsResetBtn'), null);
 
   // Click back button: returns to main reader view within the popup
   settingsBackBtn.click();

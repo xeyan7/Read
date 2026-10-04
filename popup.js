@@ -29,12 +29,14 @@ async function initPopup() {
   const settingsBackBtn = $('settingsBackBtn');
   const popupModeGroup = $('popupModeGroup');
   const settingsModeVal = $('settingsModeVal');
-  const popupFixationGroup = $('popupFixationGroup');
-  const popupFixationVal = $('popupFixationVal');
-  const settingsHostTag = $('settingsHostTag');
-  const settingsHostHint = $('settingsHostHint');
-  const settingsResetBtn = $('settingsResetBtn');
-  const openFullOptionsBtn = $('openFullOptionsBtn');
+  const siteRulesList = $('siteRulesList');
+  const siteRulesEmpty = $('siteRulesEmpty');
+  const siteRulesCount = $('siteRulesCount');
+  const siteRulesTitle = $('siteRulesTitle');
+  const siteRulesHint = $('siteRulesHint');
+  const addRuleForm = $('addRuleForm');
+  const newRuleHost = $('newRuleHost');
+  const addRuleBtn = $('addRuleBtn');
 
   let tab = null;
 
@@ -158,10 +160,14 @@ async function initPopup() {
   }
 
   function renderIntensity() {
-    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[state.intensity] : 600;
+    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[state.intensity] : 700;
+    const boost = FocusReader && FocusReader.boostFor ? FocusReader.boostFor(state.intensity) : 'transparent';
     const label = state.intensity.charAt(0).toUpperCase() + state.intensity.slice(1);
     if (dockVal) dockVal.textContent = `${label} (${weight})`;
-    if (previewSample) previewSample.style.setProperty('--wb-weight', String(weight));
+    if (previewSample) {
+      previewSample.style.setProperty('--wb-weight', String(weight));
+      previewSample.style.setProperty('--wb-boost', boost);
+    }
 
     intensityButtons.forEach((btn) => {
       const match = btn.dataset.intensity === state.intensity;
@@ -169,25 +175,6 @@ async function initPopup() {
       btn.setAttribute('aria-checked', match ? 'true' : 'false');
     });
     moveSegThumb(document.getElementById('popupIntensityGroup'));
-  }
-
-  function renderFixation() {
-    const fixationButtons = Array.from(document.querySelectorAll('#popupFixationGroup .dock-seg-btn'));
-    fixationButtons.forEach((btn) => {
-      const match = btn.dataset.fixation === state.fixation;
-      btn.classList.toggle('is-active', match);
-      btn.setAttribute('aria-checked', match ? 'true' : 'false');
-    });
-    if (popupFixationVal) {
-      if (state.fixation === 'classic') {
-        popupFixationVal.textContent = 'Classic 33%';
-      } else if (state.fixation === 'high') {
-        popupFixationVal.textContent = 'High 55%';
-      } else {
-        popupFixationVal.textContent = 'Optimal 45%';
-      }
-    }
-    moveSegThumb(document.getElementById('popupFixationGroup'));
   }
 
   function renderMode() {
@@ -203,22 +190,104 @@ async function initPopup() {
     moveSegThumb(document.getElementById('popupModeGroup'));
   }
 
-  function renderHostRule() {
-    if (settingsHostTag) {
-      settingsHostTag.textContent = state.host || 'No active web host';
+  // Non-host keys in storage — everything else boolean is a per-site rule.
+  const SITE_SYSTEM_KEYS = new Set(['mode', 'intensity', 'fixation', 'theme']);
+
+  function cleanHost(input) {
+    return (input || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^[a-zA-Z]+:\/\//, '')
+      .replace(/\/.*$/, '')
+      .trim();
+  }
+
+  // Site list follows the activation mode: automatic shows exclusions
+  // (every site bolds except these), manual shows inclusions (only these bold).
+  async function loadSiteRules() {
+    if (!siteRulesList) return;
+    const isAuto = state.mode !== 'manual';
+    const wanted = isAuto ? false : true;
+    if (siteRulesTitle) {
+      siteRulesTitle.textContent = isAuto ? 'Excluded sites' : 'Included sites';
     }
-    if (settingsHostHint) {
-      if (state.override) {
-        settingsHostHint.textContent = state.active
-          ? 'Custom: Always bolded on this site'
-          : 'Custom: Disabled on this site';
-      } else {
-        settingsHostHint.textContent = `Default: Follows ${state.mode === 'manual' ? 'manual mode' : 'auto flow'}`;
-      }
+    if (siteRulesHint) {
+      siteRulesHint.textContent = isAuto
+        ? 'Bold everywhere except these sites.'
+        : 'Bold only these sites.';
     }
-    if (settingsResetBtn) {
-      settingsResetBtn.style.display = state.override ? 'inline-block' : 'none';
+    if (siteRulesEmpty) {
+      siteRulesEmpty.textContent = isAuto
+        ? 'No excluded sites.'
+        : 'No included sites.';
     }
+    if (addRuleBtn) {
+      addRuleBtn.textContent = isAuto ? 'Exclude' : 'Include';
+    }
+    if (newRuleHost) {
+      newRuleHost.placeholder = isAuto ? 'site-to-exclude.com' : 'site-to-include.com';
+    }
+    siteRulesList.innerHTML = '';
+    let hostRules = [];
+    try {
+      const allStorage = await chrome.storage.sync.get(null);
+      hostRules = Object.entries(allStorage || {}).filter(
+        ([key, val]) => !SITE_SYSTEM_KEYS.has(key) && val === wanted
+      );
+    } catch (err) {
+      console.warn('Could not load site rules:', err);
+    }
+    if (siteRulesCount) {
+      siteRulesCount.textContent = hostRules.length ? `${hostRules.length}` : '';
+    }
+    if (siteRulesEmpty) {
+      siteRulesEmpty.style.display = hostRules.length ? 'none' : 'block';
+    }
+    hostRules.forEach(([host, isEnabled]) => {
+      const row = document.createElement('div');
+      row.className = 'rule-row';
+
+      const domainSpan = document.createElement('span');
+      domainSpan.className = 'rule-domain';
+      domainSpan.textContent = host;
+
+      const metaGroup = document.createElement('div');
+      metaGroup.className = 'rule-meta-group';
+
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `rule-status-badge ${isEnabled ? 'rule-badge-on' : 'rule-badge-off'}`;
+      statusBadge.textContent = isEnabled ? 'On' : 'Off';
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'rule-del-btn';
+      delBtn.title = `Remove rule for ${host}`;
+      delBtn.setAttribute('aria-label', `Remove rule for ${host}`);
+      delBtn.textContent = '×';
+
+      delBtn.addEventListener('click', async () => {
+        try {
+          await chrome.storage.sync.remove(host);
+        } catch (err) {
+          console.warn('Could not remove site rule:', err);
+        }
+        if (host === state.host) {
+          state.override = false;
+          state.active = state.mode !== 'manual';
+          render();
+          if (tab && tab.id != null) {
+            await sendTabMessage(tab.id, { greeting: state.active ? 'Activate' : 'Deactivate' });
+          }
+        }
+        await loadSiteRules();
+      });
+
+      metaGroup.appendChild(statusBadge);
+      metaGroup.appendChild(delBtn);
+      row.appendChild(domainSpan);
+      row.appendChild(metaGroup);
+      siteRulesList.appendChild(row);
+    });
   }
 
   function render() {
@@ -234,7 +303,6 @@ async function initPopup() {
     }
     if (previewSample) previewSample.classList.toggle('is-active', active);
     if (previewState) previewState.textContent = active ? 'Bionic' : 'Plain';
-    renderHostRule();
   }
 
   function showReady() {
@@ -285,7 +353,7 @@ async function initPopup() {
       if (state.mode === nextMode) return;
       state.mode = nextMode;
       renderMode();
-      renderHostRule();
+      await loadSiteRules();
       try {
         await chrome.storage.sync.set({ mode: nextMode });
         if (!state.override) {
@@ -301,54 +369,34 @@ async function initPopup() {
     });
   });
 
-  // Fixation buttons in settings view
-  const fixationButtons = Array.from(document.querySelectorAll('#popupFixationGroup .dock-seg-btn'));
-  fixationButtons.forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const nextFixation = FocusReader && FocusReader.normalizeFixation ? FocusReader.normalizeFixation(btn.dataset.fixation) : btn.dataset.fixation;
-      if (state.fixation === nextFixation) return;
-      state.fixation = nextFixation;
-      renderFixation();
-      updatePreviewSentence(SAMPLE_SENTENCES[sampleIndex]);
+  // Add a site to the current include / exclude list from the settings view
+  if (addRuleForm) {
+    addRuleForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const host = cleanHost(newRuleHost && newRuleHost.value);
+      if (!host) return;
+      const action = state.mode !== 'manual' ? false : true;
       try {
-        await chrome.storage.sync.set({ fixation: nextFixation });
-        if (tab && tab.id != null) {
-          await sendTabMessage(tab.id, { greeting: 'SetFixation', fixation: nextFixation });
-        }
-      } catch (e) {
-        console.error('Failed to persist fixation:', e);
-      }
-    });
-  });
-
-  // Reset custom site rule in settings view
-  if (settingsResetBtn) {
-    settingsResetBtn.addEventListener('click', async () => {
-      if (!state.host) return;
-      try {
-        await chrome.storage.sync.remove(state.host);
+        await chrome.storage.sync.set({ [host]: action });
+        if (newRuleHost) newRuleHost.value = '';
       } catch (err) {
-        console.warn('Could not reset site rule:', err);
+        console.error('Failed to save site rule:', err);
+        return;
       }
-      state.override = false;
-      state.active = state.mode !== 'manual';
-      render();
-      if (tab && tab.id != null) {
-        await sendTabMessage(tab.id, { greeting: state.active ? 'Activate' : 'Deactivate' });
+      if (host === state.host) {
+        state.override = true;
+        state.active = action;
+        render();
+        if (tab && tab.id != null) {
+          await sendTabMessage(tab.id, { greeting: action ? 'Activate' : 'Deactivate' });
+        }
       }
+      await loadSiteRules();
     });
   }
 
-  // Open full studio page button inside popup settings
-  if (openFullOptionsBtn) {
-    openFullOptionsBtn.addEventListener('click', () => {
-      if (chrome.runtime.openOptionsPage) {
-        chrome.runtime.openOptionsPage();
-      } else {
-        window.open(chrome.runtime.getURL('options.html'));
-      }
-    });
-  }
+  // Site rules render from storage alone — load immediately.
+  loadSiteRules();
 
   // Cycle preview sample sentence
   if (cycleBtn) {
@@ -399,11 +447,19 @@ async function initPopup() {
       const resp = await sendTabMessage(tab && tab.id, { greeting });
       state.reachable = resp !== undefined;
       state.active = next;
-      state.override = true;
+      // Toggling back to the mode default removes the per-site rule instead
+      // of storing a redundant one, keeping the include / exclude list exact.
+      const modeDefault = state.mode !== 'manual';
+      state.override = next !== modeDefault;
       render();
+      await loadSiteRules();
       if (state.host) {
         try {
-          await chrome.storage.sync.set({ [state.host]: next });
+          if (state.override) {
+            await chrome.storage.sync.set({ [state.host]: next });
+          } else {
+            await chrome.storage.sync.remove(state.host);
+          }
         } catch (e) {
           console.error('Storage save failed:', e);
         }
@@ -428,8 +484,8 @@ async function initPopup() {
   }
 
   renderIntensity();
-  renderFixation();
   renderMode();
+  await loadSiteRules();
   updatePreviewSentence(SAMPLE_SENTENCES[sampleIndex]);
   moveAllSegThumbs();
   window.addEventListener('resize', moveAllSegThumbs);
@@ -499,6 +555,7 @@ async function initPopup() {
   }
 
   render();
+  await loadSiteRules();
   showReady();
 }
 

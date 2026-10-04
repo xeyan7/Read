@@ -6,9 +6,6 @@
   <title>Read Fast - ADHD</title>
   <link rel="icon" type="image/png" sizes="32x32" href="icons/logo-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="icons/logo-16.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -62,7 +59,7 @@
       <section class="card" aria-label="Reading strength">
         <div class="row">
           <span class="eyebrow">Strength</span>
-          <span class="value" id="dockVal">Medium (600)</span>
+          <span class="value" id="dockVal">Medium (700)</span>
         </div>
         <div class="seg" id="popupIntensityGroup" role="radiogroup" aria-label="Reading intensity">
           <span class="seg-thumb" aria-hidden="true"></span>
@@ -123,37 +120,21 @@
         <p class="hint">Automatic bolds pages as they load. Manual waits for you.</p>
       </section>
 
-      <section class="card" aria-label="Anchor density">
+      <section class="card" aria-label="Site rules">
         <div class="row">
-          <span class="eyebrow">Density</span>
-          <span class="value" id="popupFixationVal">Optimal 45%</span>
+          <span class="eyebrow" id="siteRulesTitle">Excluded sites</span>
+          <span class="value" id="siteRulesCount"></span>
         </div>
-        <div class="seg" id="popupFixationGroup" role="radiogroup" aria-label="Fixation density">
-          <span class="seg-thumb" aria-hidden="true"></span>
-          <button type="button" class="dock-seg-btn" data-fixation="classic" role="radio" aria-checked="false">33%</button>
-          <button type="button" class="dock-seg-btn is-active" data-fixation="optimal" role="radio" aria-checked="true">45%</button>
-          <button type="button" class="dock-seg-btn" data-fixation="high" role="radio" aria-checked="false">55%</button>
+        <div class="rules">
+          <div id="siteRulesList" class="rules-list"></div>
+          <p id="siteRulesEmpty" class="rules-empty" style="display: none;">No excluded sites.</p>
         </div>
-        <p class="hint">How much of each word is bolded. 45% suits most readers.</p>
+        <form id="addRuleForm" class="rule-form">
+          <input type="text" id="newRuleHost" class="input" placeholder="site-to-exclude.com" autocomplete="off" spellcheck="false" required>
+          <button type="submit" class="btn-primary" id="addRuleBtn">Exclude</button>
+        </form>
+        <p class="hint" id="siteRulesHint">Bold everywhere except these sites.</p>
       </section>
-
-      <section class="card" aria-label="Current site">
-        <div class="row">
-          <span class="eyebrow">Current site</span>
-          <span class="site-tag" id="settingsHostTag">Detecting…</span>
-        </div>
-        <div class="row">
-          <span class="hint" id="settingsHostHint">Default behavior</span>
-          <button id="settingsResetBtn" class="ghost-btn" type="button" style="display: none;">Reset</button>
-        </div>
-      </section>
-
-      <button id="openFullOptionsBtn" class="list-btn" type="button" title="Open all preferences">
-        <span>All preferences</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M7 17L17 7M9 7h8v8"/>
-        </svg>
-      </button>
     </section>
   </div>
 

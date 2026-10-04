@@ -540,9 +540,10 @@ select:focus-visible {
 }
 
 .preview-sample .wb {
-  font-weight: var(--wb-weight, 600);
+  font-weight: var(--wb-weight, 700);
   color: var(--ink);
-  transition: font-weight 0.4s var(--ease);
+  text-shadow: 0 0 0 var(--wb-boost, transparent);
+  transition: font-weight 0.5s var(--ease), text-shadow 0.5s var(--ease);
 }
 
 /* ---------- Studio ---------- */
@@ -633,9 +634,10 @@ select:focus-visible {
 
 .studio-paragraph .extension-adhd-reader-boldify,
 .studio-paragraph .focus-reader-bold {
-  font-weight: var(--wb-weight, 600);
+  font-weight: var(--wb-weight, 700);
   color: var(--ink);
-  transition: font-weight 0.4s var(--ease);
+  text-shadow: 0 0 0 var(--wb-boost, transparent);
+  transition: font-weight 0.5s var(--ease), text-shadow 0.5s var(--ease);
 }
 
 .metrics {
