@@ -127,7 +127,7 @@ const FocusReader = {
   /** The single CSS rule that switches bionic bolding on at a given weight. */
   styleRuleFor(intensity) {
     const weight = FocusReader.INTENSITY_WEIGHTS[FocusReader.normalizeIntensity(intensity)];
-    return `.${FocusReader.BOLD_CLASS}, .${FocusReader.LEGACY_BOLD_CLASS} { font-weight: ${weight}; }`;
+    return `.${FocusReader.BOLD_CLASS}, .${FocusReader.LEGACY_BOLD_CLASS} { font-weight: ${weight}; transition: font-weight 0.4s cubic-bezier(0.16, 1, 0.3, 1); }`;
   },
 
   /** Back-compat accessor for the default rule. */
