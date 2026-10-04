@@ -15,6 +15,7 @@ async function initOptions() {
   const statusText = document.getElementById('statusText');
   const segItems = Array.from(document.querySelectorAll('#intensityGroup .seg-item'));
   const fixationItems = Array.from(document.querySelectorAll('#fixationGroup .seg-item'));
+  const saccadeItems = Array.from(document.querySelectorAll('#saccadeGroup .seg-item'));
   const preview = document.getElementById('intensityPreview');
   const previewWeightBadge = document.getElementById('previewWeightBadge');
 
@@ -37,6 +38,7 @@ async function initOptions() {
   let currentMode = FocusReader ? FocusReader.DEFAULT_MODE : 'automatic';
   let currentIntensity = FocusReader ? FocusReader.DEFAULT_INTENSITY : 'medium';
   let currentFixation = FocusReader ? FocusReader.DEFAULT_FIXATION : 'optimal';
+  let currentSaccade = FocusReader ? FocusReader.DEFAULT_SACCADE : 'optimal';
   let studioBionicActive = true;
   let currentTopic = 'science';
 
@@ -79,6 +81,15 @@ async function initOptions() {
     moveSegThumb(document.getElementById('fixationGroup'));
   }
 
+  function renderSaccade() {
+    saccadeItems.forEach((item) => {
+      const isMatch = item.dataset.saccade === currentSaccade;
+      item.classList.toggle('is-selected', isMatch);
+      item.setAttribute('aria-checked', isMatch ? 'true' : 'false');
+    });
+    moveSegThumb(document.getElementById('saccadeGroup'));
+  }
+
   // Sliding segmented pill: glide a thumb under the active option.
   function moveSegThumb(group) {
     if (!group) return;
@@ -110,20 +121,59 @@ async function initOptions() {
       item.setAttribute('aria-checked', isMatch ? 'true' : 'false');
     });
 
-    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[currentIntensity] : 700;
-    const boost = FocusReader && FocusReader.boostFor ? FocusReader.boostFor(currentIntensity) : 'transparent';
-    if (preview) {
-      preview.style.setProperty('--wb-weight', String(weight));
-      preview.style.setProperty('--wb-boost', boost);
+    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[currentIntensity] : 750;
+    const boost = FocusReader && FocusReader.boostFor ? FocusReader.boostFor(currentIntensity) : 0;
+    const stroke = FocusReader && FocusReader.strokeFor ? FocusReader.strokeFor(currentIntensity) : 0;
+    const targets = [preview, studioParagraph].filter(Boolean);
+    if (FocusReader && FocusReader.morphPreview) {
+      FocusReader.morphPreview(targets, weight, boost, stroke);
+    } else {
+      targets.forEach((el) => {
+        el.style.setProperty('--wb-weight', String(weight));
+        el.style.setProperty('--wb-boost', String(boost));
+        el.style.setProperty('--wb-stroke', `${stroke}px`);
+      });
     }
     if (previewWeightBadge) {
-      previewWeightBadge.textContent = `Weight ${weight}`;
-    }
-    if (studioParagraph) {
-      studioParagraph.style.setProperty('--wb-weight', String(weight));
-      studioParagraph.style.setProperty('--wb-boost', boost);
+      previewWeightBadge.textContent = currentIntensity.charAt(0).toUpperCase() + currentIntensity.slice(1);
     }
     moveSegThumb(document.getElementById('intensityGroup'));
+  }
+
+  const INTENSITY_SAMPLE = 'I read fast to focus attention and boost reading comprehension.';
+
+  function renderIntensityPreview() {
+    if (!preview) return;
+    preview.innerHTML = '';
+    const words = INTENSITY_SAMPLE.split(/\s+/g);
+    words.forEach((word, idx) => {
+      if (idx > 0) preview.appendChild(document.createTextNode(' '));
+      const match = word.match(/^([^a-zA-Z0-9\u00C0-\u024F]*)([\s\S]*?)([^a-zA-Z0-9\u00C0-\u024F]*)$/);
+      const prefix = match ? match[1] : '';
+      const core = match ? match[2] : word;
+      const suffix = match ? match[3] : '';
+      if (!core || !isNaN(core) || !isNaN(core.slice(0, 1))) {
+        preview.appendChild(document.createTextNode(word));
+        return;
+      }
+      const shouldBold = FocusReader && FocusReader.shouldBoldWord
+        ? FocusReader.shouldBoldWord(core, { saccade: currentSaccade, index: idx })
+        : true;
+      const boldLen = shouldBold && FocusReader && FocusReader.calculateBoldLength
+        ? FocusReader.calculateBoldLength(core, currentFixation)
+        : 0;
+      if (prefix) preview.appendChild(document.createTextNode(prefix));
+      if (boldLen >= 1) {
+        const span = document.createElement('span');
+        span.className = 'wb';
+        span.textContent = core.slice(0, boldLen);
+        preview.appendChild(span);
+        preview.appendChild(document.createTextNode(core.slice(boldLen)));
+      } else {
+        preview.appendChild(document.createTextNode(core));
+      }
+      if (suffix) preview.appendChild(document.createTextNode(suffix));
+    });
   }
 
   // --- Reading Studio Logic --------------------------------------------------
@@ -142,18 +192,31 @@ async function initOptions() {
     const words = rawText.split(/\s+/g);
     words.forEach((word, idx) => {
       if (idx > 0) studioParagraph.appendChild(document.createTextNode(' '));
-      const boldLen = FocusReader && FocusReader.calculateBoldLength
-        ? FocusReader.calculateBoldLength(word, currentFixation)
-        : Math.floor(word.length * (FocusReader ? FocusReader.BOLD_RATIO : 1 / 3));
+      const match = word.match(/^([^a-zA-Z0-9\u00C0-\u024F]*)([\s\S]*?)([^a-zA-Z0-9\u00C0-\u024F]*)$/);
+      const prefix = match ? match[1] : '';
+      const core = match ? match[2] : word;
+      const suffix = match ? match[3] : '';
+      if (!core || !isNaN(core) || !isNaN(core.slice(0, 1))) {
+        studioParagraph.appendChild(document.createTextNode(word));
+        return;
+      }
+      const shouldBold = FocusReader && FocusReader.shouldBoldWord
+        ? FocusReader.shouldBoldWord(core, { saccade: currentSaccade, index: idx })
+        : true;
+      const boldLen = shouldBold && FocusReader && FocusReader.calculateBoldLength
+        ? FocusReader.calculateBoldLength(core, currentFixation)
+        : 0;
+      if (prefix) studioParagraph.appendChild(document.createTextNode(prefix));
       if (boldLen >= 1) {
         const span = document.createElement('span');
         span.className = FocusReader ? FocusReader.BOLD_CLASS : 'focus-reader-bold';
-        span.textContent = word.slice(0, boldLen);
+        span.textContent = core.slice(0, boldLen);
         studioParagraph.appendChild(span);
-        studioParagraph.appendChild(document.createTextNode(word.slice(boldLen)));
+        studioParagraph.appendChild(document.createTextNode(core.slice(boldLen)));
       } else {
-        studioParagraph.appendChild(document.createTextNode(word));
+        studioParagraph.appendChild(document.createTextNode(core));
       }
+      if (suffix) studioParagraph.appendChild(document.createTextNode(suffix));
     });
   }
 
@@ -273,13 +336,16 @@ async function initOptions() {
 
   // --- Load saved preferences (default: always-active on all sites) -----------
   try {
-    const res = await chrome.storage.sync.get(['mode', 'intensity', 'fixation']);
+    const res = await chrome.storage.sync.get(['mode', 'intensity', 'fixation', 'saccade']);
     currentMode = FocusReader ? FocusReader.normalizeMode(res && res.mode) : (res && res.mode === 'manual' ? 'manual' : 'automatic');
     if (res && res.intensity !== undefined) {
       currentIntensity = FocusReader ? FocusReader.normalizeIntensity(res.intensity) : res.intensity;
     }
     if (res && res.fixation !== undefined && FocusReader && FocusReader.normalizeFixation) {
       currentFixation = FocusReader.normalizeFixation(res.fixation);
+    }
+    if (res && res.saccade !== undefined && FocusReader && FocusReader.normalizeSaccade) {
+      currentSaccade = FocusReader.normalizeSaccade(res.saccade);
     }
   } catch (err) {
     console.warn('Could not read storage:', err);
@@ -288,6 +354,8 @@ async function initOptions() {
   renderMode();
   renderIntensity();
   renderFixation();
+  renderSaccade();
+  renderIntensityPreview();
   renderStudio();
   moveAllSegThumbs();
   window.addEventListener('resize', moveAllSegThumbs);
@@ -327,8 +395,7 @@ async function initOptions() {
     if (intensity === currentIntensity) return;
     currentIntensity = FocusReader ? FocusReader.normalizeIntensity(intensity) : intensity;
     renderIntensity();
-    renderStudio();
-    flash(`Intensity set to ${currentIntensity}`);
+    flash(`Intensity set to ${currentIntensity.charAt(0).toUpperCase() + currentIntensity.slice(1)}`);
     try {
       await chrome.storage.sync.set({ intensity: currentIntensity });
     } catch (err) {
@@ -352,6 +419,7 @@ async function initOptions() {
     if (fixation === currentFixation) return;
     currentFixation = FocusReader && FocusReader.normalizeFixation ? FocusReader.normalizeFixation(fixation) : fixation;
     renderFixation();
+    renderIntensityPreview();
     renderStudio();
     flash(`Anchor density set to ${currentFixation}`);
     try {
@@ -368,6 +436,32 @@ async function initOptions() {
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         selectFixation(item.dataset.fixation);
+      }
+    });
+  });
+
+  // --- Saccade frequency changes ---------------------------------------------
+  async function selectSaccade(saccade) {
+    if (saccade === currentSaccade) return;
+    currentSaccade = FocusReader && FocusReader.normalizeSaccade ? FocusReader.normalizeSaccade(saccade) : saccade;
+    renderSaccade();
+    renderIntensityPreview();
+    renderStudio();
+    flash(`Fixation frequency set to ${currentSaccade}`);
+    try {
+      await chrome.storage.sync.set({ saccade: currentSaccade });
+    } catch (err) {
+      console.error('Failed to save saccade:', err);
+      if (statusText) statusText.textContent = 'Failed to save preference.';
+    }
+  }
+
+  saccadeItems.forEach((item) => {
+    item.addEventListener('click', () => selectSaccade(item.dataset.saccade));
+    item.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        selectSaccade(item.dataset.saccade);
       }
     });
   });

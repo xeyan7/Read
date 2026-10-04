@@ -19,6 +19,7 @@ if (!globalThis.__focusReaderContentLoaded) {
     let initialized = false;
     let intensity = FocusReader.DEFAULT_INTENSITY;
     let fixation = FocusReader.DEFAULT_FIXATION || 'optimal';
+    let saccade = FocusReader.DEFAULT_SACCADE || 'optimal';
     let observer = null;
     let isMutatingDOM = false;
     let rafId = null;
@@ -56,7 +57,7 @@ if (!globalThis.__focusReaderContentLoaded) {
       try {
         const paragraphs = document.querySelectorAll('p');
         for (const p of paragraphs) {
-          FocusReader.boldifyParagraph(p, { fixation });
+          FocusReader.boldifyParagraph(p, { fixation, saccade });
         }
       } finally {
         isMutatingDOM = false;
@@ -113,13 +114,22 @@ if (!globalThis.__focusReaderContentLoaded) {
       return fixation;
     }
 
+    function applySaccade(next) {
+      saccade = FocusReader.normalizeSaccade ? FocusReader.normalizeSaccade(next) : next;
+      if (isActive()) boldifyAllParagraphs();
+      return saccade;
+    }
+
     async function decideActive() {
       try {
-        const { mode, intensity: storedIntensity, fixation: storedFixation } =
-          await chrome.storage.sync.get(['mode', 'intensity', 'fixation']);
+        const { mode, intensity: storedIntensity, fixation: storedFixation, saccade: storedSaccade } =
+          await chrome.storage.sync.get(['mode', 'intensity', 'fixation', 'saccade']);
         if (storedIntensity !== undefined) intensity = FocusReader.normalizeIntensity(storedIntensity);
         if (storedFixation !== undefined && FocusReader.normalizeFixation) {
           fixation = FocusReader.normalizeFixation(storedFixation);
+        }
+        if (storedSaccade !== undefined && FocusReader.normalizeSaccade) {
+          saccade = FocusReader.normalizeSaccade(storedSaccade);
         }
         return await FocusReader.resolveActive(document.location.href, mode);
       } catch {
@@ -173,6 +183,7 @@ if (!globalThis.__focusReaderContentLoaded) {
       stopWatching,
       applyIntensity,
       applyFixation,
+      applySaccade,
       refreshActive,
       decideActive,
       get intensity() {
@@ -180,6 +191,9 @@ if (!globalThis.__focusReaderContentLoaded) {
       },
       get fixation() {
         return fixation;
+      },
+      get saccade() {
+        return saccade;
       },
       get initialized() {
         return initialized;
@@ -222,6 +236,10 @@ if (!globalThis.__focusReaderContentLoaded) {
         FocusReaderContent.applyFixation(msg.fixation);
         sendResponse(true);
         break;
+      case 'SetSaccade':
+        FocusReaderContent.applySaccade(msg.saccade);
+        sendResponse(true);
+        break;
     }
   });
 
@@ -229,5 +247,6 @@ if (!globalThis.__focusReaderContentLoaded) {
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.intensity) FocusReaderContent.applyIntensity(changes.intensity.newValue);
     if (changes.fixation) FocusReaderContent.applyFixation(changes.fixation.newValue);
+    if (changes.saccade) FocusReaderContent.applySaccade(changes.saccade.newValue);
   });
 }

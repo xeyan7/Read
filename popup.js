@@ -47,6 +47,7 @@ async function initPopup() {
     override: false,
     intensity: FocusReader ? FocusReader.DEFAULT_INTENSITY : 'medium',
     fixation: FocusReader ? FocusReader.DEFAULT_FIXATION : 'optimal',
+    saccade: FocusReader ? FocusReader.DEFAULT_SACCADE : 'optimal',
     mode: FocusReader ? FocusReader.DEFAULT_MODE : 'automatic',
   };
 
@@ -54,10 +55,10 @@ async function initPopup() {
   // an explicit <br> so words-per-line stay identical on every strength.
   // (Bolder text runs wider, which otherwise drags words across lines.)
   const SAMPLE_SENTENCES = [
-    ['Focus reader guides your eyes', 'smoothly through long articles.'],
-    ['Bionic reading anchors each word', 'for faster, calmer scanning.'],
-    ['Dense pages turn clear and calm', 'for focused, faster reading.'],
-    ['Your visual cortex follows', 'guided words with ease.'],
+    ['I read fast to focus attention', 'and boost reading comprehension.'],
+    ['A visual reader guides letters', 'with optimal speed and focus.'],
+    ['Research proves the cortex scans', 'each sentence with deep focus.'],
+    ['The cat saw a bird in the tree', 'and watched internationalization.'],
   ];
   let sampleIndex = 0;
 
@@ -139,34 +140,56 @@ async function initPopup() {
     if (!previewSample) return;
     previewSample.innerHTML = '';
     const lines = Array.isArray(pair) ? pair : [pair];
+    let wordCount = 0;
     lines.forEach((line, li) => {
       if (li > 0) previewSample.appendChild(document.createElement('br'));
       line.split(/\s+/g).forEach((word, idx) => {
+        if (!word) return;
         if (idx > 0) previewSample.appendChild(document.createTextNode(' '));
-        const boldLen = FocusReader && FocusReader.calculateBoldLength
-          ? FocusReader.calculateBoldLength(word, state.fixation || 'optimal')
-          : Math.floor(word.length * (FocusReader ? FocusReader.BOLD_RATIO : 1 / 3));
+        const match = word.match(/^([^a-zA-Z0-9\u00C0-\u024F]*)([\s\S]*?)([^a-zA-Z0-9\u00C0-\u024F]*)$/);
+        const prefix = match ? match[1] : '';
+        const core = match ? match[2] : word;
+        const suffix = match ? match[3] : '';
+        if (!core || !isNaN(core) || !isNaN(core.slice(0, 1))) {
+          previewSample.appendChild(document.createTextNode(word));
+          return;
+        }
+        const shouldBold = FocusReader && FocusReader.shouldBoldWord
+          ? FocusReader.shouldBoldWord(core, { saccade: state.saccade || 'optimal', index: wordCount })
+          : true;
+        wordCount++;
+        const boldLen = shouldBold && FocusReader && FocusReader.calculateBoldLength
+          ? FocusReader.calculateBoldLength(core, state.fixation || 'optimal')
+          : 0;
+        if (prefix) previewSample.appendChild(document.createTextNode(prefix));
         if (boldLen >= 1) {
           const span = document.createElement('span');
           span.className = 'wb';
-          span.textContent = word.slice(0, boldLen);
+          span.textContent = core.slice(0, boldLen);
           previewSample.appendChild(span);
-          previewSample.appendChild(document.createTextNode(word.slice(boldLen)));
+          previewSample.appendChild(document.createTextNode(core.slice(boldLen)));
         } else {
-          previewSample.appendChild(document.createTextNode(word));
+          previewSample.appendChild(document.createTextNode(core));
         }
+        if (suffix) previewSample.appendChild(document.createTextNode(suffix));
       });
     });
   }
 
   function renderIntensity() {
-    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[state.intensity] : 700;
-    const boost = FocusReader && FocusReader.boostFor ? FocusReader.boostFor(state.intensity) : 'transparent';
+    const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[state.intensity] : 750;
+    const boost = FocusReader && FocusReader.boostFor ? FocusReader.boostFor(state.intensity) : 0;
+    const stroke = FocusReader && FocusReader.strokeFor ? FocusReader.strokeFor(state.intensity) : 0;
     const label = state.intensity.charAt(0).toUpperCase() + state.intensity.slice(1);
-    if (dockVal) dockVal.textContent = `${label} (${weight})`;
+    if (dockVal) dockVal.textContent = label;
     if (previewSample) {
-      previewSample.style.setProperty('--wb-weight', String(weight));
-      previewSample.style.setProperty('--wb-boost', boost);
+      if (FocusReader && FocusReader.morphPreview) {
+        FocusReader.morphPreview(previewSample, weight, boost, stroke);
+      } else {
+        previewSample.style.setProperty('--wb-weight', String(weight));
+        previewSample.style.setProperty('--wb-boost', String(boost));
+        previewSample.style.setProperty('--wb-stroke', `${stroke}px`);
+      }
     }
 
     intensityButtons.forEach((btn) => {
@@ -191,7 +214,7 @@ async function initPopup() {
   }
 
   // Non-host keys in storage — everything else boolean is a per-site rule.
-  const SITE_SYSTEM_KEYS = new Set(['mode', 'intensity', 'fixation', 'theme']);
+  const SITE_SYSTEM_KEYS = new Set(['mode', 'intensity', 'fixation', 'saccade', 'theme']);
 
   function cleanHost(input) {
     return (input || '')
@@ -469,12 +492,15 @@ async function initPopup() {
 
   // --- Load Saved Preferences ---
   try {
-    const stored = await chrome.storage.sync.get(['intensity', 'fixation', 'mode']);
+    const stored = await chrome.storage.sync.get(['intensity', 'fixation', 'saccade', 'mode']);
     if (stored && stored.intensity) {
       state.intensity = FocusReader.normalizeIntensity(stored.intensity);
     }
     if (stored && stored.fixation && FocusReader.normalizeFixation) {
       state.fixation = FocusReader.normalizeFixation(stored.fixation);
+    }
+    if (stored && stored.saccade && FocusReader.normalizeSaccade) {
+      state.saccade = FocusReader.normalizeSaccade(stored.saccade);
     }
     if (stored && stored.mode && FocusReader.normalizeMode) {
       state.mode = FocusReader.normalizeMode(stored.mode);

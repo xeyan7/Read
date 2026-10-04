@@ -30,7 +30,13 @@ test('popup loads and renders quick intensity dock in active state', async () =>
   assert.equal(toggleBtn.getAttribute('aria-pressed'), 'true');
 
   const dockVal = page.document.getElementById('dockVal');
-  assert.equal(dockVal.textContent, 'Strong (900)');
+  assert.equal(dockVal.textContent, 'Strong');
+
+  // Preview applies the calibrated weight for strong (850)
+  const preview = page.document.getElementById('previewSample');
+  assert.equal(preview.style.getPropertyValue('--wb-weight'), '850');
+  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.18');
+  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.12px');
 
   // Verify clicking Light intensity button updates storage and UI
   const lightBtn = page.document.querySelector('.dock-seg-btn[data-intensity="light"]');
@@ -39,7 +45,39 @@ test('popup loads and renders quick intensity dock in active state', async () =>
   await settle();
 
   assert.equal(page.mock.storage.intensity, 'light');
-  assert.equal(dockVal.textContent, 'Light (500)');
+  assert.equal(dockVal.textContent, 'Light');
+  assert.equal(preview.style.getPropertyValue('--wb-weight'), '600');
+  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0');
+  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0px');
+});
+
+test('strength preview morphs smoothly via stroke width transition', async () => {
+  const page = createPage({ scripts: ['shared.js'] });
+  const FR = page.window.FocusReader;
+
+  // Stroke ramps per strength so the morph has a continuously
+  // interpolable channel (font-weight alone snaps between faces).
+  assert.equal(FR.strokeFor('light'), 0);
+  assert.ok(FR.strokeFor('medium') > 0);
+  assert.ok(FR.strokeFor('strong') > FR.strokeFor('medium'));
+
+  // morphPreview writes all three channels at once; CSS transitions glide them.
+  const el = page.window.document.createElement('p');
+  FR.morphPreview(el, 700, 0.15, 0.1);
+  assert.equal(el.style.getPropertyValue('--wb-weight'), '700');
+  assert.equal(el.style.getPropertyValue('--wb-boost'), '0.15');
+  assert.equal(el.style.getPropertyValue('--wb-stroke'), '0.1px');
+
+  // Legacy 3-arg calls keep working without clearing the stroke.
+  FR.morphPreview(el, 600, 0);
+  assert.equal(el.style.getPropertyValue('--wb-weight'), '600');
+  assert.equal(el.style.getPropertyValue('--wb-stroke'), '0.1px');
+
+  // Both preview stylesheets animate the stroke channel.
+  assert.match(readSource('popup.css'), /-webkit-text-stroke-width:\s*var\(--wb-stroke/);
+  assert.match(readSource('popup.css'), /transition:[^;]*-webkit-text-stroke-width/);
+  assert.match(readSource('options.css'), /-webkit-text-stroke-width:\s*var\(--wb-stroke/);
+  assert.match(readSource('options.css'), /transition:[^;]*-webkit-text-stroke-width/);
 });
 
 test('popup defaults to always-active when tab is unreachable and no prefs exist', async () => {
@@ -101,15 +139,42 @@ test('popup cycles sample sentences', async () => {
 
   const preview = page.document.getElementById('previewSample');
   const initialText = preview.textContent;
+  assert.ok(initialText.includes('I read fast to focus attention'));
+  assert.ok(initialText.includes('comprehension'));
+
+  // Sentence 1 bolded spans adhere to tiers:
+  // I (0), read (2 're'), fast (2 'fa'), to (0), focus (2 'fo'), attention (5 'atten'),
+  // and (0), boost (2 'bo'), reading (3 'rea'), comprehension (6 'compre')
+  const initialBolds = Array.from(preview.querySelectorAll('.wb')).map((s) => s.textContent);
+  assert.deepEqual(initialBolds, ['re', 'fa', 'fo', 'atten', 'bo', 'rea', 'compre']);
 
   const cycleBtn = page.document.getElementById('cycleSampleBtn');
   assert.ok(cycleBtn);
+
+  // Cycle 1: visual reader
   cycleBtn.click();
   await settle();
+  assert.ok(preview.textContent.includes('A visual reader guides letters'));
+  const cycle1Bolds = Array.from(preview.querySelectorAll('.wb')).map((s) => s.textContent);
+  assert.deepEqual(cycle1Bolds, ['vis', 'rea', 'gui', 'let', 'wi', 'opt', 'sp', 'fo']);
 
-  const updatedText = preview.textContent;
-  assert.notEqual(initialText, updatedText);
-  assert.ok(updatedText.length > 10);
+  // Cycle 2: research & sentence
+  cycleBtn.click();
+  await settle();
+  assert.ok(preview.textContent.includes('Research proves the cortex scans'));
+  const cycle2Bolds = Array.from(preview.querySelectorAll('.wb')).map((s) => s.textContent);
+  assert.deepEqual(cycle2Bolds, ['Rese', 'pro', 'cor', 'sc', 'ea', 'sent', 'wi', 'de', 'fo']);
+
+  // Cycle 3: cat & internationalization
+  cycleBtn.click();
+  await settle();
+  assert.ok(preview.textContent.includes('cat saw a bird'));
+  assert.ok(preview.textContent.includes('internationalization'));
+  const cycle3Bolds = Array.from(preview.querySelectorAll('.wb')).map((s) => s.textContent);
+  // 'cat' is a 3-letter content word -> bolded by 1 letter ('c')
+  // 'internationalization' -> 20-letter word -> 10 letters ('internatio')
+  assert.ok(cycle3Bolds.includes('c'));
+  assert.ok(cycle3Bolds.includes('internatio'));
 });
 
 test('popup self-heals tabs missing the content script', async () => {
@@ -290,6 +355,49 @@ test('options page manages fixation anchor density presets', async () => {
   assert.equal(metricAnchor.textContent, '33%');
 });
 
+test('options page manages word fixation frequency presets (saccade)', async () => {
+  const html = readSource('options.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'options.js'],
+    storage: { saccade: 'optimal' },
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const optBtn = page.document.querySelector('[data-saccade="optimal"]');
+  const allBtn = page.document.querySelector('[data-saccade="all"]');
+  const altBtn = page.document.querySelector('[data-saccade="alternating"]');
+  assert.ok(optBtn);
+  assert.ok(allBtn);
+  assert.ok(altBtn);
+  assert.ok(optBtn.classList.contains('is-selected'));
+
+  const intensityPreview = page.document.getElementById('intensityPreview');
+  assert.ok(intensityPreview);
+  // Optimal saccade: short function words 'to' and 'and' are unbolded
+  const optBolds = Array.from(intensityPreview.querySelectorAll('.wb')).map((s) => s.textContent);
+  assert.deepEqual(optBolds, ['re', 'fa', 'fo', 'atten', 'bo', 'rea', 'compre']);
+
+  allBtn.click();
+  await settle();
+
+  assert.equal(page.mock.storage.saccade, 'all');
+  assert.ok(allBtn.classList.contains('is-selected'));
+  assert.ok(!optBtn.classList.contains('is-selected'));
+
+  // 'All' saccade: 'to' ('t') and 'and' ('a') are now anchored with 1 letter bolded
+  const allBolds = Array.from(intensityPreview.querySelectorAll('.wb')).map((s) => s.textContent);
+  assert.deepEqual(allBolds, ['re', 'fa', 't', 'fo', 'atten', 'a', 'bo', 'rea', 'compre']);
+
+  altBtn.click();
+  await settle();
+
+  assert.equal(page.mock.storage.saccade, 'alternating');
+  assert.ok(altBtn.classList.contains('is-selected'));
+});
+
 test('popup settings gear opens preferences within extension and allows adjustments', async () => {
   const html = readSource('popup.html');
   const page = createPage({
@@ -410,5 +518,64 @@ test('popup settings gear opens preferences within extension and allows adjustme
   assert.equal(viewMain.style.display, 'flex');
   assert.equal(viewSettings.style.display, 'none');
   assert.ok(!settingsWheel.classList.contains('is-active'));
+});
+
+test('options page intensity controls display only text labels without numbers and apply 600/750/850 weights', async () => {
+  const html = readSource('options.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'options.js'],
+    storage: { intensity: 'medium' },
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  // All strength segmented buttons must display only text labels (no numbers/meta)
+  const segButtons = Array.from(page.document.querySelectorAll('#intensityGroup .seg-item'));
+  assert.equal(segButtons.length, 3);
+  const titles = segButtons.map((b) => b.querySelector('.seg-title').textContent.trim());
+  assert.deepEqual(titles, ['Light', 'Medium', 'Strong']);
+
+  // Verify none of the buttons contain numeric seg-meta
+  segButtons.forEach((b) => {
+    assert.equal(b.querySelector('.seg-meta'), null, 'Button should not have numeric seg-meta');
+  });
+
+  // Preview badge shows 'Medium' (no numbers)
+  const badge = page.document.getElementById('previewWeightBadge');
+  assert.ok(badge);
+  assert.equal(badge.textContent, 'Medium');
+
+  // Preview element has calibrated medium weight 750
+  const preview = page.document.getElementById('intensityPreview');
+  assert.ok(preview);
+  assert.equal(preview.style.getPropertyValue('--wb-weight'), '750');
+  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.08');
+  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.05px');
+
+  // Click Strong button -> updates to 850, badge to 'Strong'
+  const strongBtn = page.document.querySelector('#intensityGroup [data-intensity="strong"]');
+  assert.ok(strongBtn);
+  strongBtn.click();
+  await settle();
+
+  assert.equal(page.mock.storage.intensity, 'strong');
+  assert.equal(badge.textContent, 'Strong');
+  assert.equal(preview.style.getPropertyValue('--wb-weight'), '850');
+  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.18');
+  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.12px');
+
+  // Click Light button -> updates to 600, badge to 'Light'
+  const lightBtn = page.document.querySelector('#intensityGroup [data-intensity="light"]');
+  assert.ok(lightBtn);
+  lightBtn.click();
+  await settle();
+
+  assert.equal(page.mock.storage.intensity, 'light');
+  assert.equal(badge.textContent, 'Light');
+  assert.equal(preview.style.getPropertyValue('--wb-weight'), '600');
+  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0');
+  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0px');
 });
 

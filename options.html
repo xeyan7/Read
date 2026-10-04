@@ -91,24 +91,21 @@
           <span class="seg-thumb" aria-hidden="true"></span>
           <button type="button" class="seg-item" data-intensity="light" role="radio" aria-checked="false">
             <span class="seg-title">Light</span>
-            <span class="seg-meta">500</span>
           </button>
           <button type="button" class="seg-item is-selected" data-intensity="medium" role="radio" aria-checked="true">
             <span class="seg-title">Medium</span>
-            <span class="seg-meta">700</span>
           </button>
           <button type="button" class="seg-item" data-intensity="strong" role="radio" aria-checked="false">
             <span class="seg-title">Strong</span>
-            <span class="seg-meta">900</span>
           </button>
         </div>
         <div class="preview-box">
           <div class="preview-head">
             <span class="label">Preview</span>
-            <span class="chip" id="previewWeightBadge">Weight 700</span>
+            <span class="chip" id="previewWeightBadge">Medium</span>
           </div>
           <p class="preview-sample" id="intensityPreview">
-            <span class="wb">Foc</span>us <span class="wb">rea</span>der <span class="wb">gui</span>des <span class="wb">yo</span>ur <span class="wb">ey</span>es <span class="wb">smoo</span>thly <span class="wb">thro</span>ugh <span class="wb">lon</span>g <span class="wb">arti</span>cles.
+            I <span class="wb">re</span>ad <span class="wb">fa</span>st to <span class="wb">fo</span>cus <span class="wb">atten</span>tion and <span class="wb">bo</span>ost <span class="wb">rea</span>ding <span class="wb">compre</span>hension.
           </p>
         </div>
       </section>
@@ -116,8 +113,8 @@
       <!-- Density -->
       <section class="card" aria-labelledby="headingFixation">
         <div class="card-head">
-          <h2 class="card-title" id="headingFixation">Density</h2>
-          <p class="card-sub">How much of each word gets bolded.</p>
+          <h2 class="card-title" id="headingFixation">Letter Anchor Depth</h2>
+          <p class="card-sub">How many letters of each word get bolded.</p>
         </div>
         <div class="segmented" id="fixationGroup" role="radiogroup" aria-label="Fixation anchor density">
           <span class="seg-thumb" aria-hidden="true"></span>
@@ -135,6 +132,30 @@
           </button>
         </div>
         <p class="note">Optimal places the anchor 35–45% into each word, where the eye naturally lands.</p>
+      </section>
+
+      <!-- Word Frequency / Saccade Cadence -->
+      <section class="card" aria-labelledby="headingSaccade">
+        <div class="card-head">
+          <h2 class="card-title" id="headingSaccade">Word Fixation Frequency</h2>
+          <p class="card-sub">How many words receive bold fixation anchors.</p>
+        </div>
+        <div class="segmented" id="saccadeGroup" role="radiogroup" aria-label="Word fixation frequency">
+          <span class="seg-thumb" aria-hidden="true"></span>
+          <button type="button" class="seg-item is-selected" data-saccade="optimal" role="radio" aria-checked="true">
+            <span class="seg-title">Optimal</span>
+            <span class="seg-meta">~67%</span>
+          </button>
+          <button type="button" class="seg-item" data-saccade="all" role="radio" aria-checked="false">
+            <span class="seg-title">All Words</span>
+            <span class="seg-meta">100%</span>
+          </button>
+          <button type="button" class="seg-item" data-saccade="alternating" role="radio" aria-checked="false">
+            <span class="seg-title">Alternating</span>
+            <span class="seg-meta">50%</span>
+          </button>
+        </div>
+        <p class="note">Optimal bolds ~67% of words by bypassing short function words (the, to, in), mirroring natural Keith Rayner eye-movement research.</p>
       </section>
 
       <!-- Studio -->

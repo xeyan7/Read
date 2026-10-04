@@ -42,20 +42,20 @@
   --surface: #FFFFFF;
   --surface-2: #F1F1F1;
   --surface-hover: #FAFAFA;
-  --border: rgba(0, 0, 0, 0.16);
-  --border-strong: rgba(0, 0, 0, 0.28);
+  --border: rgba(0, 0, 0, 0.24);
+  --border-strong: rgba(0, 0, 0, 0.38);
 
-  --ink: #111111;
-  --ink-2: #444444;
-  --muted: #686868;
-  --faint: #9C9C9C;
+  --ink: #000000;
+  --ink-2: #242424;
+  --muted: #444444;
+  --faint: #686868;
 
-  --primary: #111111;
+  --primary: #000000;
   --primary-ink: #FFFFFF;
 
   --accent: #1F8A57;
-  --dots: rgba(0, 0, 0, 0.14);
-  --dots-on: rgba(0, 0, 0, 0.38);
+  --dots: rgba(0, 0, 0, 0.32);
+  --dots-on: rgba(0, 0, 0, 0.52);
 }
 
 * {
@@ -420,7 +420,7 @@ button:focus-visible {
 
 :root[data-theme="light"] .seg-thumb {
   background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.20);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10px) saturate(160%);
   -webkit-backdrop-filter: blur(10px) saturate(160%);
@@ -470,14 +470,17 @@ button:focus-visible {
 .preview-sample .wb {
   font-weight: 400;
   text-shadow: 0 0 0 transparent;
-  transition: font-weight 0.5s var(--ease), text-shadow 0.5s var(--ease), color 0.2s;
+  -webkit-text-stroke-width: 0px;
+  transition: font-weight 0.35s var(--ease), -webkit-text-stroke-width 0.35s var(--ease), color 0.2s;
 }
 
 .preview-sample.is-active .wb {
   font-weight: var(--wb-weight, 700);
   color: var(--ink);
-  text-shadow: 0 0 0 var(--wb-boost, transparent);
-  transition: font-weight 0.5s var(--ease), text-shadow 0.5s var(--ease), color 0.2s;
+  text-shadow: 0 0 0 transparent;
+  -webkit-text-stroke-width: var(--wb-stroke, 0px);
+  -webkit-text-stroke-color: currentColor;
+  transition: font-weight 0.35s var(--ease), -webkit-text-stroke-width 0.35s var(--ease), color 0.2s;
 }
 
 /* ---------- Footer ---------- */
