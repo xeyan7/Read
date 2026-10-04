@@ -32,12 +32,12 @@ const FocusReader = {
   /* Applied weights use calibrated font faces:
    * Light = 600 (semi-bold, calm and low-contrast for prolonged reading),
    * Medium = 750 (bold, balanced daily reading),
-   * Strong = 850 (extra-bold/heavy, authoritative punchy presence).
+   * Strong = 825 (extra-bold/heavy, authoritative punchy presence).
    * Clear, distinct visual separation between all three tiers. */
-  INTENSITY_WEIGHTS: { light: 600, medium: 750, strong: 850 },
+  INTENSITY_WEIGHTS: { light: 600, medium: 750, strong: 825 },
 
   /* Displayed weights matching the applied font weights. */
-  INTENSITY_DISPLAY_WEIGHTS: { light: 600, medium: 750, strong: 850 },
+  INTENSITY_DISPLAY_WEIGHTS: { light: 600, medium: 750, strong: 825 },
 
   /* Faux-bold boost per strength as a 0..1 alpha: a zero-blur text-shadow
    * whose alpha ramps with intensity. Distinct step between medium and strong. */

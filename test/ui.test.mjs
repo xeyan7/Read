@@ -32,9 +32,9 @@ test('popup loads and renders quick intensity dock in active state', async () =>
   const dockVal = page.document.getElementById('dockVal');
   assert.equal(dockVal.textContent, 'Strong');
 
-  // Preview applies the calibrated weight for strong (850)
+  // Preview applies the calibrated weight for strong (825)
   const preview = page.document.getElementById('previewSample');
-  assert.equal(preview.style.getPropertyValue('--wb-weight'), '850');
+  assert.equal(preview.style.getPropertyValue('--wb-weight'), '825');
   assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.18');
   assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.12px');
 
@@ -520,7 +520,7 @@ test('popup settings gear opens preferences within extension and allows adjustme
   assert.ok(!settingsWheel.classList.contains('is-active'));
 });
 
-test('options page intensity controls display only text labels without numbers and apply 600/750/850 weights', async () => {
+test('options page intensity controls display only text labels without numbers and apply 600/750/825 weights', async () => {
   const html = readSource('options.html');
   const page = createPage({
     html,
@@ -554,7 +554,7 @@ test('options page intensity controls display only text labels without numbers a
   assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.08');
   assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.05px');
 
-  // Click Strong button -> updates to 850, badge to 'Strong'
+  // Click Strong button -> updates to 825, badge to 'Strong'
   const strongBtn = page.document.querySelector('#intensityGroup [data-intensity="strong"]');
   assert.ok(strongBtn);
   strongBtn.click();
@@ -562,7 +562,7 @@ test('options page intensity controls display only text labels without numbers a
 
   assert.equal(page.mock.storage.intensity, 'strong');
   assert.equal(badge.textContent, 'Strong');
-  assert.equal(preview.style.getPropertyValue('--wb-weight'), '850');
+  assert.equal(preview.style.getPropertyValue('--wb-weight'), '825');
   assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.18');
   assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.12px');
 

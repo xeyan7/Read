@@ -37,23 +37,32 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #F6F6F6;
+  --bg: #F2F2F3;
   --surface: #FFFFFF;
-  --surface-2: #F1F1F1;
-  --border: rgba(0, 0, 0, 0.24);
-  --border-strong: rgba(0, 0, 0, 0.38);
+  --surface-2: #EDEDEF;
+  --border: rgba(0, 0, 0, 0.09);
+  --border-strong: rgba(0, 0, 0, 0.18);
 
-  --ink: #000000;
-  --ink-2: #242424;
-  --muted: #444444;
-  --faint: #686868;
+  --ink: #0A0A0A;
+  --ink-2: #3A3A3C;
+  --muted: #6B6B70;
+  --faint: #9C9CA1;
 
-  --primary: #000000;
+  --primary: #0A0A0A;
   --primary-ink: #FFFFFF;
-  --primary-hover: #222222;
+  --primary-hover: #262626;
 
   --accent: #1F8A57;
   --danger: #B4232C;
+
+  /* Elevation — see popup.css for rationale */
+  --shadow-card:
+    0 0 0 0.5px rgba(0, 0, 0, 0.02),
+    0 1px 2px rgba(16, 16, 20, 0.04),
+    0 8px 24px -10px rgba(16, 16, 20, 0.12);
+  --shadow-ctrl: 0 1px 2px rgba(16, 16, 20, 0.06), inset 0 1px 0 #FFFFFF;
+  --shadow-well: inset 0 1px 2px rgba(16, 16, 20, 0.06);
+  --sheen: linear-gradient(180deg, #FFFFFF 0%, #FCFCFD 100%);
 }
 
 * {
@@ -924,4 +933,104 @@ select:focus-visible {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ---------- Light theme: depth & elevation layer ----------
+ * Matches the popup elevation system: cards cast soft layered shadows,
+ * controls are elevated, inputs and preview wells are recessed.
+ */
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(120% 70% at 50% -10%, #FFFFFF 0%, rgba(255, 255, 255, 0) 60%),
+    var(--bg);
+}
+
+:root[data-theme="light"] .card {
+  background: var(--sheen);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="light"] .logo-img {
+  box-shadow: 0 1px 2px rgba(16, 16, 20, 0.08);
+}
+
+:root[data-theme="light"] .icon-btn,
+:root[data-theme="light"] .badge {
+  box-shadow: var(--shadow-ctrl);
+}
+
+:root[data-theme="light"] .icon-btn:hover {
+  background: var(--surface);
+  box-shadow: 0 2px 6px rgba(16, 16, 20, 0.08), inset 0 1px 0 #FFFFFF;
+}
+
+:root[data-theme="light"] .mode-item,
+:root[data-theme="light"] .theme-item {
+  box-shadow: 0 1px 2px rgba(16, 16, 20, 0.04);
+}
+
+:root[data-theme="light"] .mode-item:hover,
+:root[data-theme="light"] .theme-item:hover {
+  box-shadow: 0 2px 8px rgba(16, 16, 20, 0.07);
+}
+
+:root[data-theme="light"] .mode-item.is-selected,
+:root[data-theme="light"] .theme-item.is-selected {
+  background: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(16, 16, 20, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+/* Recessed wells */
+:root[data-theme="light"] .segmented,
+:root[data-theme="light"] .preview-box,
+:root[data-theme="light"] .studio-viewport,
+:root[data-theme="light"] .input,
+:root[data-theme="light"] .select {
+  background: #F4F4F5;
+  box-shadow: var(--shadow-well);
+}
+
+:root[data-theme="light"] .input:focus,
+:root[data-theme="light"] .select:focus {
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .seg-thumb {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 2px rgba(16, 16, 20, 0.08),
+    0 3px 8px -2px rgba(16, 16, 20, 0.10);
+}
+
+:root[data-theme="light"] .chip {
+  background: #F7F7F8;
+}
+
+:root[data-theme="light"] .topic-chip {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(16, 16, 20, 0.04);
+}
+
+:root[data-theme="light"] .topic-chip.is-active {
+  background: #FFFFFF;
+  box-shadow: 0 1px 4px rgba(16, 16, 20, 0.10);
+}
+
+:root[data-theme="light"] .studio-btn {
+  box-shadow: var(--shadow-ctrl);
+}
+
+:root[data-theme="light"] .studio-btn-primary {
+  box-shadow: 0 1px 3px rgba(16, 16, 20, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+:root[data-theme="light"] .btn-primary {
+  box-shadow: 0 1px 3px rgba(16, 16, 20, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+:root[data-theme="light"] .rules {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(16, 16, 20, 0.04);
 }

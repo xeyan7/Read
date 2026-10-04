@@ -276,15 +276,15 @@ test('boldifyParagraph applies research-optimal word fixation cadence', () => {
 
 test('intensity weights and faux-bold channels are calibrated to prevent visual fatigue', () => {
   const { FR } = loadEngine();
-  // Calibrated weights: Light = 600, Medium = 750, Strong = 850
+  // Calibrated weights: Light = 600, Medium = 750, Strong = 825
   assert.equal(FR.INTENSITY_WEIGHTS.light, 600);
   assert.equal(FR.INTENSITY_WEIGHTS.medium, 750);
-  assert.equal(FR.INTENSITY_WEIGHTS.strong, 850);
+  assert.equal(FR.INTENSITY_WEIGHTS.strong, 825);
 
   // Display numbers match applied weights
   assert.equal(FR.displayWeightFor('light'), 600);
   assert.equal(FR.displayWeightFor('medium'), 750);
-  assert.equal(FR.displayWeightFor('strong'), 850);
+  assert.equal(FR.displayWeightFor('strong'), 825);
 
   // Label helper returns UI strings without numbers
   assert.equal(FR.labelFor('light'), 'Light');
