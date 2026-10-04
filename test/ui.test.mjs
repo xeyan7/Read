@@ -72,12 +72,22 @@ test('strength preview morphs smoothly via stroke width transition', async () =>
   FR.morphPreview(el, 600, 0);
   assert.equal(el.style.getPropertyValue('--wb-weight'), '600');
   assert.equal(el.style.getPropertyValue('--wb-stroke'), '0.1px');
+  assert.ok(el.classList.contains('is-morphing'));
 
-  // Both preview stylesheets animate the stroke channel.
+  // Both preview stylesheets declare @property and animate channels for smooth morphing.
+  assert.match(readSource('popup.css'), /@property\s+--wb-weight/);
+  assert.match(readSource('popup.css'), /@property\s+--wb-stroke/);
+  assert.match(readSource('popup.css'), /@property\s+--wb-boost/);
   assert.match(readSource('popup.css'), /-webkit-text-stroke-width:\s*var\(--wb-stroke/);
   assert.match(readSource('popup.css'), /transition:[^;]*-webkit-text-stroke-width/);
+  assert.match(readSource('popup.css'), /transition:[^;]*--wb-weight/);
+
+  assert.match(readSource('options.css'), /@property\s+--wb-weight/);
+  assert.match(readSource('options.css'), /@property\s+--wb-stroke/);
+  assert.match(readSource('options.css'), /@property\s+--wb-boost/);
   assert.match(readSource('options.css'), /-webkit-text-stroke-width:\s*var\(--wb-stroke/);
   assert.match(readSource('options.css'), /transition:[^;]*-webkit-text-stroke-width/);
+  assert.match(readSource('options.css'), /transition:[^;]*--wb-weight/);
 });
 
 test('popup defaults to always-active when tab is unreachable and no prefs exist', async () => {

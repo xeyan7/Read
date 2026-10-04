@@ -3,6 +3,24 @@
  * Geist + Geist Mono, one quiet accent used only for "on" signals.
  */
 
+@property --wb-weight {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 750;
+}
+
+@property --wb-stroke {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --wb-boost {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -33,43 +51,47 @@
   --r-ctrl: 9px;
   --r-inner: 7px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-morph: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #F2F2F3;
+  --bg: #EBEBED;
   --surface: #FFFFFF;
-  --surface-2: #EDEDEF;
-  --surface-hover: #FAFAFA;
-  --border: rgba(0, 0, 0, 0.09);
-  --border-strong: rgba(0, 0, 0, 0.18);
+  --surface-2: #E8E8EB;
+  --surface-hover: #FFFFFF;
+  --border: rgba(17, 17, 19, 0.1);
+  --border-strong: rgba(17, 17, 19, 0.18);
 
-  --ink: #0A0A0A;
-  --ink-2: #3A3A3C;
-  --muted: #6B6B70;
-  --faint: #9C9CA1;
+  --ink: #131316;
+  --ink-2: #4A4A4F;
+  --muted: #6D6D73;
+  --faint: #A3A3A9;
 
-  --primary: #0A0A0A;
+  --primary: #131316;
   --primary-ink: #FFFFFF;
 
   --accent: #1F8A57;
-  --dots: rgba(0, 0, 0, 0.11);
-  --dots-on: rgba(0, 0, 0, 0.24);
+  --dots: rgba(17, 17, 19, 0.08);
+  --dots-on: rgba(17, 17, 19, 0.16);
+
+  --well: #E3E3E8;
+  --well-ink: #62626A;
 
   /* Elevation — light mode can't layer by luminance like dark does,
-   * so depth comes from soft shadows, a top sheen and recessed wells. */
+   * so depth comes from stronger shadows, crisp hairlines and darker recessed wells. */
   --shadow-card:
-    0 0 0 0.5px rgba(0, 0, 0, 0.02),
-    0 1px 2px rgba(16, 16, 20, 0.04),
-    0 6px 16px -6px rgba(16, 16, 20, 0.10);
+    0 0 0 0.5px rgba(17, 17, 19, 0.04),
+    0 1px 2px rgba(17, 17, 20, 0.06),
+    0 10px 24px -12px rgba(17, 17, 20, 0.18);
   --shadow-card-hover:
-    0 0 0 0.5px rgba(0, 0, 0, 0.03),
-    0 2px 4px rgba(16, 16, 20, 0.05),
-    0 12px 24px -8px rgba(16, 16, 20, 0.14);
-  --shadow-ctrl: 0 1px 2px rgba(16, 16, 20, 0.06), inset 0 1px 0 #FFFFFF;
-  --shadow-well: inset 0 1px 2px rgba(16, 16, 20, 0.06);
-  --sheen: linear-gradient(180deg, #FFFFFF 0%, #FCFCFD 100%);
+    0 0 0 0.5px rgba(17, 17, 19, 0.06),
+    0 2px 5px rgba(17, 17, 20, 0.07),
+    0 16px 32px -12px rgba(17, 17, 20, 0.22);
+  --shadow-ctrl: 0 1px 2px rgba(17, 17, 20, 0.07), inset 0 1px 0 #FFFFFF;
+  --shadow-well: inset 0 1px 3px rgba(17, 17, 20, 0.1), inset 0 0 0 1px rgba(17, 17, 19, 0.03);
+  --sheen: linear-gradient(180deg, #FFFFFF 0%, #F6F6F7 100%);
 }
 
 * {
@@ -433,11 +455,11 @@ button:focus-visible {
 }
 
 :root[data-theme="light"] .seg-thumb {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.20);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px) saturate(160%);
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  background: #FFFFFF;
+  border: 1px solid rgba(17, 17, 19, 0.08);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(17, 17, 20, 0.1), 0 4px 10px -2px rgba(17, 17, 20, 0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .dock-seg-btn {
@@ -464,7 +486,12 @@ button:focus-visible {
   border-color: transparent;
 }
 
-/* ---------- Preview ---------- */
+/* ---------- Preview ----------
+ * Buttery 60fps morph: ONLY the container animates the three custom
+ * properties (--wb-weight / --wb-stroke / --wb-boost). The .wb spans
+ * reflect them instantly with NO transition of their own — per-span
+ * font-weight / text-shadow / letter-spacing transitions stack on every
+ * intermediate value and drop to ~12fps with visible latency. */
 .preview-sample {
   font-size: 13.5px;
   line-height: 1.65;
@@ -479,22 +506,42 @@ button:focus-visible {
   line-clamp: 2;
   overflow: hidden;
   min-height: calc(3.3em + 24px);
+  contain: layout style;
+  transform: translateZ(0);
+  transition: --wb-weight 0.55s var(--ease-morph),
+              --wb-stroke 0.55s var(--ease-morph),
+              --wb-boost 0.55s var(--ease-morph),
+              -webkit-text-stroke-width 0.55s var(--ease-morph);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.preview-sample.is-morphing {
+  will-change: --wb-weight, --wb-stroke, --wb-boost;
 }
 
 .preview-sample .wb {
   font-weight: 400;
+  font-variation-settings: 'wght' 400;
   text-shadow: 0 0 0 transparent;
   -webkit-text-stroke-width: 0px;
-  transition: font-weight 0.35s var(--ease), -webkit-text-stroke-width 0.35s var(--ease), color 0.2s;
+  letter-spacing: 0px;
+  /* Instant follow — the container's custom-property glide drives the morph.
+   * No per-span transition: keeps rapid light/medium/strong switches at 60fps. */
+  transition: none;
 }
 
 .preview-sample.is-active .wb {
   font-weight: var(--wb-weight, 700);
+  font-variation-settings: 'wght' var(--wb-weight, 700);
   color: var(--ink);
-  text-shadow: 0 0 0 transparent;
+  text-shadow: 0 0 calc(var(--wb-boost, 0) * 3.5px) currentColor, 0 0 calc(var(--wb-boost, 0) * 1px) currentColor;
   -webkit-text-stroke-width: var(--wb-stroke, 0px);
   -webkit-text-stroke-color: currentColor;
-  transition: font-weight 0.35s var(--ease), -webkit-text-stroke-width 0.35s var(--ease), color 0.2s;
+  /* Static tracking — animating letter-spacing forces layout per frame. */
+  letter-spacing: 0px;
+  transition: none;
 }
 
 /* ---------- Footer ---------- */
@@ -718,12 +765,12 @@ button:focus-visible {
 /* ---------- Light theme: depth layer ----------
  * Dark mode gets its depth for free from stacked luminance
  * (#0A0A0A canvas → #141414 cards → glassy pill). On a light canvas that
- * cue vanishes, so we restore it with elevation: raised surfaces cast soft
- * shadows, inputs/tracks are recessed, and the canvas has ambient light.
+ * cue vanishes, so we restore it with elevation: brighter cards on a
+ * darker canvas, deeply recessed wells, and quieter dot texture.
  */
 :root[data-theme="light"] body {
   background:
-    radial-gradient(120% 70% at 50% -10%, #FFFFFF 0%, rgba(255, 255, 255, 0) 60%),
+    radial-gradient(120% 70% at 50% -10%, #FFFFFF 0%, rgba(255, 255, 255, 0) 55%),
     var(--bg);
 }
 
@@ -731,81 +778,140 @@ button:focus-visible {
 :root[data-theme="light"] .status-card,
 :root[data-theme="light"] .spinner {
   background: var(--sheen);
+  border-color: var(--border);
   box-shadow: var(--shadow-card);
   transition: border-color 0.2s, box-shadow 0.25s var(--ease), transform 0.2s var(--ease);
 }
 
 :root[data-theme="light"] .status-card:hover {
   box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-strong);
 }
 
 :root[data-theme="light"] .status-card.is-active {
-  border-color: rgba(0, 0, 0, 0.14);
+  border-color: var(--border-strong);
+}
+
+/* Quieter dots in light: grey noise reads as dirt, so fade + tighten. */
+:root[data-theme="light"] .status-card::after {
+  width: 46%;
+  opacity: 0.7;
+  -webkit-mask-image: linear-gradient(to left, #000 5%, transparent 75%);
+  mask-image: linear-gradient(to left, #000 5%, transparent 75%);
 }
 
 :root[data-theme="light"] .logo-img {
-  box-shadow: 0 1px 2px rgba(16, 16, 20, 0.08);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(17, 17, 20, 0.1), 0 0 0 0.5px rgba(17, 17, 19, 0.04);
 }
 
 :root[data-theme="light"] .icon-btn {
+  background: #fff;
+  border-color: var(--border);
   box-shadow: var(--shadow-ctrl);
+  color: #55555C;
 }
 
 :root[data-theme="light"] .icon-btn:hover {
-  background: var(--surface);
-  box-shadow: 0 2px 6px rgba(16, 16, 20, 0.08), inset 0 1px 0 #FFFFFF;
+  background: #FFFFFF;
+  color: var(--ink);
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 6px rgba(17, 17, 20, 0.1), inset 0 1px 0 #FFFFFF;
 }
 
 :root[data-theme="light"] .icon-btn.is-active {
-  box-shadow: 0 2px 6px rgba(16, 16, 20, 0.22);
+  box-shadow: 0 2px 6px rgba(17, 17, 20, 0.22);
 }
 
-/* Recessed wells */
+/* Recessed wells — deliberately darker than canvas so white cards read as raised */
 :root[data-theme="light"] .seg,
 :root[data-theme="light"] .preview-sample,
 :root[data-theme="light"] .input {
-  background: #F4F4F5;
+  background: var(--well);
+  border-color: rgba(17, 17, 19, 0.08);
   box-shadow: var(--shadow-well);
 }
 
 :root[data-theme="light"] .input:focus {
-  background: var(--surface);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+  background: #fff;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(17, 17, 19, 0.08);
+}
+
+/* Bionic contrast: light base text was too close to black bold, so wash the
+ * sentence out and keep anchors pure black. */
+:root[data-theme="light"] .preview-sample {
+  color: var(--well-ink);
+}
+
+:root[data-theme="light"] .preview-sample.is-active .wb {
+  color: #000000;
+}
+
+:root[data-theme="light"] .dock-seg-btn {
+  color: #77777E;
+}
+
+:root[data-theme="light"] .dock-seg-btn:hover {
+  color: var(--ink);
+}
+
+:root[data-theme="light"] .dock-seg-btn.is-active {
+  color: #000000;
+  font-weight: 600;
 }
 
 /* Pill sits clearly above its track */
 :root[data-theme="light"] .seg-thumb {
   background: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(17, 17, 19, 0.07);
   box-shadow:
-    0 1px 2px rgba(16, 16, 20, 0.08),
-    0 3px 8px -2px rgba(16, 16, 20, 0.10);
+    inset 0 1px 0 #FFFFFF,
+    0 1px 2px rgba(17, 17, 20, 0.1),
+    0 4px 10px -2px rgba(17, 17, 20, 0.16);
 }
 
 :root[data-theme="light"] .chip {
-  background: #F7F7F8;
+  background: #EFEFF1;
+  border-color: rgba(17, 17, 19, 0.08);
+  color: #55555C;
 }
 
-/* Switch: white knob riding on the track, like a physical toggle */
+:root[data-theme="light"] .eyebrow {
+  color: #55555C;
+}
+
+:root[data-theme="light"] .status-sub {
+  color: #6D6D73;
+}
+
+/* Switch: light-grey off track with bordered knob, clean black on track */
 :root[data-theme="light"] .switch {
-  background: #E4E4E7;
-  border-color: rgba(0, 0, 0, 0.06);
-  box-shadow: inset 0 1px 2px rgba(16, 16, 20, 0.10);
+  background: #D9D9DE;
+  border-color: rgba(17, 17, 19, 0.08);
+  box-shadow: inset 0 1px 3px rgba(17, 17, 20, 0.14);
 }
 
 :root[data-theme="light"] .switch-knob {
   background: #FFFFFF;
-  box-shadow: 0 1px 3px rgba(16, 16, 20, 0.25), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  border: 0.5px solid rgba(17, 17, 19, 0.1);
+  box-shadow: 0 1px 3px rgba(17, 17, 20, 0.28);
 }
 
 :root[data-theme="light"] .status-card.is-active .switch {
   background: var(--primary);
   border-color: var(--primary);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  box-shadow: none;
+}
+
+:root[data-theme="light"] .status-card.is-active .switch-knob {
+  background: #fff;
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 :root[data-theme="light"] .btn-primary {
-  box-shadow: 0 1px 2px rgba(16, 16, 20, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 2px rgba(17, 17, 20, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 :root[data-theme="light"] .rules {

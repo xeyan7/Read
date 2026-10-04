@@ -8,7 +8,7 @@
 
 'use strict';
 
-const FocusReader = {
+var FocusReader = globalThis.FocusReader || {
   STYLE_ID: 'adhdReaderStyleTag',
   LEGACY_STYLE_ID: 'focusReaderStyleTag',
 
@@ -223,16 +223,41 @@ const FocusReader = {
   },
 
   /** The single CSS rule that switches bionic bolding on at a given weight.
-   * Includes the faux-bold stroke so real pages match the popup/options
-   * previews (previously only font-weight was applied on pages). */
+   * Var-driven so BOTH previews and live websites glide: the rule itself
+   * never changes between strengths — only the three --wb-* vars move, and
+   * their CSS transition (+ WAAPI glide in morphPreview) interpolates them
+   * at 60fps. Hardcoding numbers per strength would snap. */
   styleRuleFor(intensity) {
     const key = FocusReader.normalizeIntensity(intensity);
     const weight = FocusReader.INTENSITY_WEIGHTS[key];
+    const boost = FocusReader.boostFor(key);
     const stroke = FocusReader.strokeFor(key);
-    if (stroke > 0) {
-      return `.${FocusReader.BOLD_CLASS}, .${FocusReader.LEGACY_BOLD_CLASS} { font-weight: ${weight}; -webkit-text-stroke-width: ${stroke}px; -webkit-text-stroke-color: currentColor; transition: font-weight 0.4s cubic-bezier(0.16, 1, 0.3, 1); }`;
-    }
-    return `.${FocusReader.BOLD_CLASS}, .${FocusReader.LEGACY_BOLD_CLASS} { font-weight: ${weight}; transition: font-weight 0.4s cubic-bezier(0.16, 1, 0.3, 1); }`;
+    const ease = FocusReader.MORPH_EASING || 'cubic-bezier(0.22, 1, 0.36, 1)';
+    const ms = FocusReader.MORPH_MS || 550;
+    return (
+      `@property --wb-weight{syntax:'<number>';inherits:true;initial-value:750;}` +
+      `@property --wb-stroke{syntax:'<length>';inherits:true;initial-value:0px;}` +
+      `@property --wb-boost{syntax:'<number>';inherits:true;initial-value:0;}` +
+      `:root{--wb-weight:${weight};--wb-boost:${boost};--wb-stroke:${stroke}px;` +
+      `transition:--wb-weight ${ms}ms ${ease},--wb-stroke ${ms}ms ${ease},--wb-boost ${ms}ms ${ease},` +
+      `-webkit-text-stroke-width ${ms}ms ${ease};}` +
+      `.${FocusReader.BOLD_CLASS}, .${FocusReader.LEGACY_BOLD_CLASS} { ` +
+      `font-weight: var(--wb-weight, ${weight}); ` +
+      `font-variation-settings: 'wght' var(--wb-weight, ${weight}); ` +
+      `color: inherit; ` +
+      `text-shadow: 0 0 calc(var(--wb-boost, ${boost}) * 3.5px) currentColor, 0 0 calc(var(--wb-boost, ${boost}) * 1px) currentColor; ` +
+      `-webkit-text-stroke-width: var(--wb-stroke, ${stroke}px); -webkit-text-stroke-color: currentColor; }`
+    );
+  },
+
+  /** Plain var triple for an intensity (used for WAAPI / inline sets). */
+  varsFor(intensity) {
+    const key = FocusReader.normalizeIntensity(intensity);
+    return {
+      weight: FocusReader.INTENSITY_WEIGHTS[key],
+      boost: FocusReader.boostFor(key),
+      stroke: FocusReader.strokeFor(key),
+    };
   },
 
   /** Zero-blur text-shadow boost alpha for a strength (0 when unknown). */
@@ -264,13 +289,93 @@ const FocusReader = {
     return key.charAt(0).toUpperCase() + key.slice(1);
   },
 
-  /* Preview morph duration in ms. Must match the CSS transition on
-   * .wb (--wb-stroke / font-weight / text-shadow) in popup.css + options.css. */
-  MORPH_MS: 350,
+  /* Preview + website morph duration in ms. Must match the CSS transition on
+   * .preview-sample / :root (--wb-weight / --wb-stroke / --wb-boost)
+   * in popup.css + options.css + content pages. ~550ms with an expo-out
+   * curve reads as a deliberate buttery glide rather than a snap. */
+  MORPH_MS: 550,
+  MORPH_EASING: 'cubic-bezier(0.22, 1, 0.36, 1)',
 
-  /* In-flight animation frame ids per preview container (legacy rAF driver;
-   * retained so old frames can be cancelled after the CSS-driven rewrite). */
+  /* In-flight morph timeout ids per preview container, so rapid
+   * light -> medium -> strong clicks retarget cleanly instead of stacking. */
   _morphRafs: typeof WeakMap !== 'undefined' ? new WeakMap() : null,
+  _morphState: typeof WeakMap !== 'undefined' ? new WeakMap() : null,
+  _morphAnims: typeof WeakMap !== 'undefined' ? new WeakMap() : null,
+
+  /** Current effective vars for an element (last morphed or inline values). */
+  _readMorphVars(el) {
+    const numOrNaN = (raw) => {
+      if (raw == null) return NaN;
+      const str = String(raw).trim().replace(/px\s*$/, '');
+      if (!str) return NaN;
+      const n = Number(str);
+      return Number.isFinite(n) ? n : NaN;
+    };
+    let w = NaN;
+    let b = NaN;
+    let s;
+    try {
+      const cached = FocusReader._morphState ? FocusReader._morphState.get(el) : null;
+      if (cached) {
+        if (Number.isFinite(cached.w)) w = cached.w;
+        if (Number.isFinite(cached.b)) b = cached.b;
+        if (cached.s !== undefined) s = cached.s;
+      }
+    } catch (_) {}
+    try {
+      if (el && el.style) {
+        if (!Number.isFinite(w)) {
+          const parsedW = numOrNaN(el.style.getPropertyValue('--wb-weight'));
+          if (Number.isFinite(parsedW)) w = parsedW;
+        }
+        if (!Number.isFinite(b)) {
+          const parsedB = numOrNaN(el.style.getPropertyValue('--wb-boost'));
+          if (Number.isFinite(parsedB)) b = parsedB;
+        }
+        if (s === undefined) {
+          const parsedS = numOrNaN(el.style.getPropertyValue('--wb-stroke'));
+          if (Number.isFinite(parsedS)) s = parsedS;
+        }
+      }
+    } catch (_) {}
+    // Fall back to computed style when nothing was ever set (first morph
+    // then starts from the live value instead of jumping).
+    try {
+      if ((typeof window !== 'undefined' && window.getComputedStyle && el) &&
+          (!Number.isFinite(w) || !Number.isFinite(b) || s === undefined)) {
+        const cs = window.getComputedStyle(el);
+        if (cs && typeof cs.getPropertyValue === 'function') {
+          if (!Number.isFinite(w)) {
+            const parsedW = numOrNaN(cs.getPropertyValue('--wb-weight'));
+            if (Number.isFinite(parsedW)) w = parsedW;
+          }
+          if (!Number.isFinite(b)) {
+            const parsedB = numOrNaN(cs.getPropertyValue('--wb-boost'));
+            if (Number.isFinite(parsedB)) b = parsedB;
+          }
+          if (s === undefined) {
+            const parsedS = numOrNaN(cs.getPropertyValue('--wb-stroke'));
+            if (Number.isFinite(parsedS)) s = parsedS;
+          }
+        }
+      }
+    } catch (_) {}
+    return {
+      w: Number.isFinite(w) ? w : 750,
+      b: Number.isFinite(b) ? b : 0.08,
+      s: s !== undefined ? s : 0.05,
+    };
+  },
+
+  /** True when the user prefers no animation — glide collapses to instant. */
+  _prefersReducedMotion() {
+    try {
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+    } catch (_) {}
+    return false;
+  },
 
   /**
    * Morph preview bolding to the given weight / boost / stroke.
@@ -283,6 +388,15 @@ const FocusReader = {
    * (stroke left untouched). Falls back to the same instant set when motion
    * is reduced or animation is unavailable — the values are identical, only
    * the CSS transition is suppressed by prefers-reduced-motion.
+   *
+   * On top of the CSS glide, a Web Animations glide on the same three vars
+   * is layered (Chromium animates registered custom props on the compositor
+   * at a full 60fps). Inline styles still land synchronously on the final
+   * values, so tests + persistence see the target instantly while the eye
+   * sees a buttery from -> to glide with zero latency.
+   *
+   * Pass { instant: true } to skip the glide (used for the large studio
+   * paragraph and first paint, where animating dozens of anchors janks).
    */
   morphPreview(containers, toWeight, toBoost, strokeOrOpts, maybeOpts) {
     const els = (Array.isArray(containers) ? containers : [containers]).filter(
@@ -297,27 +411,141 @@ const FocusReader = {
       if (strokeOrOpts !== undefined) toStroke = Number(strokeOrOpts);
       if (maybeOpts != null && typeof maybeOpts === 'object') opts = maybeOpts;
     }
-    void opts;
     const targetW = Number(toWeight);
     const targetB = Number(toBoost);
     const hasStroke = toStroke !== undefined && Number.isFinite(toStroke);
+    const instant = Boolean(opts && opts.instant);
+    const reduced = FocusReader._prefersReducedMotion();
     const cancel = (el) => {
       if (FocusReader._morphRafs) {
         const prev = FocusReader._morphRafs.get(el);
         if (prev) {
+          try {
+            if (typeof clearTimeout === 'function') clearTimeout(prev);
+          } catch (_) {}
           try {
             if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(prev);
           } catch (_) {}
         }
         FocusReader._morphRafs.delete(el);
       }
+      if (FocusReader._morphAnims) {
+        try {
+          const prevAnim = FocusReader._morphAnims.get(el);
+          if (prevAnim && typeof prevAnim.cancel === 'function') prevAnim.cancel();
+        } catch (_) {}
+        try {
+          FocusReader._morphAnims.delete(el);
+        } catch (_) {}
+      }
+    };
+    const glide = (el, from) => {
+      // WAAPI layer: visual-only glide. Inline style already holds the final
+      // values, so this never affects tests — it only smooths pixels.
+      try {
+        if (reduced || instant) return;
+        if (!el.animate || typeof el.animate !== 'function') return;
+        const sameW = from.w === targetW || (!Number.isFinite(targetW) && true);
+        const sameB = from.b === targetB || (!Number.isFinite(targetB) && true);
+        const sameS = !hasStroke || from.s === toStroke;
+        if (sameW && sameB && sameS) return;
+        const fromFrame = {};
+        const toFrame = {};
+        if (Number.isFinite(targetW)) {
+          fromFrame['--wb-weight'] = String(from.w);
+          toFrame['--wb-weight'] = String(targetW);
+        }
+        if (Number.isFinite(targetB)) {
+          fromFrame['--wb-boost'] = String(from.b);
+          toFrame['--wb-boost'] = String(targetB);
+        }
+        if (hasStroke) {
+          fromFrame['--wb-stroke'] = `${from.s}px`;
+          toFrame['--wb-stroke'] = `${toStroke}px`;
+        }
+        const anim = el.animate([fromFrame, toFrame], {
+          duration: FocusReader.MORPH_MS || 550,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          fill: 'none',
+        });
+        if (FocusReader._morphAnims) {
+          FocusReader._morphAnims.set(el, anim);
+          try {
+            if (anim.finished && typeof anim.finished.then === 'function') {
+              anim.finished.then(() => {
+                try {
+                  if (FocusReader._morphAnims.get(el) === anim) FocusReader._morphAnims.delete(el);
+                } catch (_) {}
+              }).catch(() => {});
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
     };
     els.forEach((el) => {
+      const from = FocusReader._readMorphVars(el);
       cancel(el);
+      // Instant path: suppress the CSS glide for one frame so large text
+      // (studio) and first paint apply with zero latency.
+      if (instant && el.style) {
+        let prevTransition = '';
+        try {
+          prevTransition = el.style.transition || '';
+          el.style.transition = 'none';
+        } catch (_) {}
+        if (Number.isFinite(targetW)) el.style.setProperty('--wb-weight', String(targetW));
+        if (Number.isFinite(targetB)) el.style.setProperty('--wb-boost', String(targetB));
+        if (hasStroke) el.style.setProperty('--wb-stroke', `${toStroke}px`);
+        try {
+          void el.offsetWidth;
+        } catch (_) {}
+        try {
+          el.style.transition = prevTransition;
+        } catch (_) {}
+        if (FocusReader._morphState) {
+          FocusReader._morphState.set(el, { w: targetW, b: targetB, s: hasStroke ? toStroke : from.s });
+        }
+        return;
+      }
       if (Number.isFinite(targetW)) el.style.setProperty('--wb-weight', String(targetW));
       if (Number.isFinite(targetB)) el.style.setProperty('--wb-boost', String(targetB));
       if (hasStroke) el.style.setProperty('--wb-stroke', `${toStroke}px`);
+
+      if (FocusReader._morphState) {
+        FocusReader._morphState.set(el, {
+          w: Number.isFinite(targetW) ? targetW : from.w,
+          b: Number.isFinite(targetB) ? targetB : from.b,
+          s: hasStroke ? toStroke : from.s,
+        });
+      }
+      glide(el, from);
+      if (el.classList && typeof el.classList.add === 'function') {
+        el.classList.add('is-morphing');
+        const timer = setTimeout(() => {
+          if (el.classList && typeof el.classList.remove === 'function') {
+            el.classList.remove('is-morphing');
+          }
+          if (FocusReader._morphRafs) {
+            try {
+              if (FocusReader._morphRafs.get(el) === timer) FocusReader._morphRafs.delete(el);
+            } catch (_) {}
+          }
+        }, FocusReader.MORPH_MS || 550);
+        if (FocusReader._morphRafs) {
+          FocusReader._morphRafs.set(el, timer);
+        }
+      }
     });
+  },
+
+  /** Read back the last morphed values for a container (rAF coalescing). */
+  morphStateFor(el) {
+    if (FocusReader._morphState && el) {
+      try {
+        return FocusReader._morphState.get(el) || null;
+      } catch (_) {}
+    }
+    return null;
   },
 
   /** Back-compat accessor for the default rule. */
@@ -533,3 +761,31 @@ FocusReader.__getChildTextNodes = FocusReader.getChildTextNodes;
 // Expose globally
 globalThis.FocusReader = FocusReader;
 globalThis.ERead = FocusReader;
+
+// Register typed CSS properties for hardware-accelerated preview morphing
+if (typeof CSS !== 'undefined' && typeof CSS.registerProperty === 'function') {
+  try {
+    CSS.registerProperty({
+      name: '--wb-weight',
+      syntax: '<number>',
+      inherits: true,
+      initialValue: '750',
+    });
+  } catch (_) {}
+  try {
+    CSS.registerProperty({
+      name: '--wb-stroke',
+      syntax: '<length>',
+      inherits: true,
+      initialValue: '0px',
+    });
+  } catch (_) {}
+  try {
+    CSS.registerProperty({
+      name: '--wb-boost',
+      syntax: '<number>',
+      inherits: true,
+      initialValue: '0',
+    });
+  } catch (_) {}
+}

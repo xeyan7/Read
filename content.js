@@ -37,11 +37,40 @@ if (!globalThis.__focusReaderContentLoaded) {
       return tag;
     }
 
+    // Live website vars live on <html> inline style so switching strength
+    // only touches 3 custom props on ONE element (60fps). The static
+    // stylesheet below reads them via var() — no full restyle, no snap.
+    function currentVars() {
+      const w = FocusReader.INTENSITY_WEIGHTS[intensity];
+      const b = FocusReader.boostFor(intensity);
+      const s = FocusReader.strokeFor(intensity);
+      return { weight: w, boost: b, stroke: s };
+    }
+
     function setActive(on) {
       const tag = ensureStyleTag();
-      const rule = on ? FocusReader.styleRuleFor(intensity) : '';
-      tag.textContent = rule;
-      tag.innerHTML = rule;
+      if (!on) {
+        tag.textContent = '';
+        tag.innerHTML = '';
+        return;
+      }
+      // Static var-driven rule (rewritten only when off -> on). Strength
+      // itself lives in <html> inline vars and glides via morphPreview.
+      const rule = FocusReader.styleRuleFor(intensity);
+      if (tag.textContent !== rule) {
+        tag.textContent = rule;
+        tag.innerHTML = rule;
+      }
+      // Ensure live vars match current strength instantly on (re)activate.
+      try {
+        const v = currentVars();
+        const root = document.documentElement;
+        if (root && root.style) {
+          root.style.setProperty('--wb-weight', String(v.weight));
+          root.style.setProperty('--wb-boost', String(v.boost));
+          root.style.setProperty('--wb-stroke', `${v.stroke}px`);
+        }
+      } catch (_) {}
     }
 
     function isActive() {
@@ -103,8 +132,27 @@ if (!globalThis.__focusReaderContentLoaded) {
     }
 
     function applyIntensity(next) {
-      intensity = FocusReader.normalizeIntensity(next);
-      if (isActive()) setActive(true);
+      const normalized = FocusReader.normalizeIntensity(next);
+      if (normalized === intensity && isActive()) return intensity;
+      intensity = normalized;
+      if (!isActive()) return intensity;
+      // Buttery website morph: glide the 3 vars on <html> — the static
+      // stylesheet follows instantly per frame at 60fps (CSS transition +
+      // WAAPI layer inside morphPreview). No stylesheet rewrite, no snap.
+      try {
+        const v = currentVars();
+        if (FocusReader.morphPreview) {
+          FocusReader.morphPreview(document.documentElement, v.weight, v.boost, v.stroke);
+        } else if (document.documentElement && document.documentElement.style) {
+          document.documentElement.style.setProperty('--wb-weight', String(v.weight));
+          document.documentElement.style.setProperty('--wb-boost', String(v.boost));
+          document.documentElement.style.setProperty('--wb-stroke', `${v.stroke}px`);
+        }
+      } catch (_) {
+        try {
+          setActive(true);
+        } catch (_) {}
+      }
       return intensity;
     }
 

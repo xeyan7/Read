@@ -22,8 +22,12 @@ async function currentMode() {
 }
 
 async function sendToTab(tabId, greeting) {
+  return sendMsgToTab(tabId, { greeting });
+}
+
+async function sendMsgToTab(tabId, msg) {
   try {
-    await chrome.tabs.sendMessage(tabId, { greeting }, { frameId: 0 });
+    await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
     return;
   } catch (_) {
     // No receiving end — tab predates the content script. Inject, retry once.
@@ -33,7 +37,7 @@ async function sendToTab(tabId, greeting) {
           target: { tabId, allFrames: false },
           files: ['shared.js', 'content.js'],
         });
-        await chrome.tabs.sendMessage(tabId, { greeting }, { frameId: 0 });
+        await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
       }
     } catch (_) {}
   }
@@ -67,10 +71,38 @@ chrome.storage.onChanged.addListener(async (changes) => {
             await sendToTab(tab.id, 'Activate');
             await syncBadge(tab.id, '');
           }
+        } else {
+          // Unknown mode value — fall back to effective state so an explicit
+          // per-site rule still wins (excluded stays off, included stays on).
+          try {
+            const active = await FocusReader.resolveActive(tab.url, nextMode);
+            await sendMsgToTab(tab.id, { greeting: active ? 'Activate' : 'Deactivate' });
+            await syncBadge(tab.id, active ? '' : 'off');
+          } catch (_) {}
         }
       }
     } catch (err) {
       console.warn('Mode broadcast error:', err);
+    }
+  }
+  // Live-apply reading calibration to every open tab so a strength / density
+  // change takes effect without reload. Content scripts also listen to
+  // storage directly; this covers tabs whose receiver missed that event.
+  const liveKeys = [
+    ['intensity', 'SetIntensity'],
+    ['fixation', 'SetFixation'],
+    ['saccade', 'SetSaccade'],
+  ];
+  for (const [key, greeting] of liveKeys) {
+    if (changes[key]) {
+      try {
+        const tabs = (await chrome.tabs.query({})).filter(isWebTab);
+        for (const tab of tabs) {
+          await sendMsgToTab(tab.id, { greeting, [key]: changes[key].newValue });
+        }
+      } catch (err) {
+        console.warn(`${key} broadcast error:`, err);
+      }
     }
   }
 });
@@ -90,15 +122,13 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== 'complete' || !isWebTab(tab)) return;
   try {
-    const hostState = await FocusReader.shouldBeActiveForUrl(tab.url);
-    if (hostState === false) {
-      await syncBadge(tabId, 'off');
-    } else {
-      const { mode } = await chrome.storage.sync.get(['mode']);
-      if (mode !== 'manual') {
-        await syncBadge(tabId, '');
-      }
-    }
+    // Effective state: explicit per-site true/false wins; otherwise the
+    // global mode decides (manual = off by default, automatic = on).
+    // This keeps excluded sites showing 'off' and included sites clearing
+    // the badge in every mode combination.
+    const { mode } = await chrome.storage.sync.get(['mode']);
+    const active = await FocusReader.resolveActive(tab.url, mode);
+    await syncBadge(tabId, active ? '' : 'off');
   } catch (_) {}
 });
 
@@ -106,11 +136,20 @@ chrome.runtime.onInstalled.addListener(async () => {
   try {
     await chrome.action.enable();
   } catch (_) {}
-  // Default to always-active on all sites for fresh installs.
+  // Seed first-install defaults so preferences are saved from the start:
+  // dark UI theme, medium strength, automatic activation. Only fills keys
+  // that are still missing so existing user choices are never overwritten.
   try {
-    const { mode } = await chrome.storage.sync.get(['mode']);
-    if (mode === undefined) {
-      await chrome.storage.sync.set({ mode: 'automatic' });
+    const FR = typeof FocusReader !== 'undefined' ? FocusReader : null;
+    const stored = await chrome.storage.sync.get(['mode', 'intensity', 'theme', 'fixation', 'saccade']);
+    const seed = {};
+    if (stored.mode === undefined) seed.mode = (FR && FR.DEFAULT_MODE) || 'automatic';
+    if (stored.intensity === undefined) seed.intensity = (FR && FR.DEFAULT_INTENSITY) || 'medium';
+    if (stored.theme === undefined) seed.theme = (FR && FR.DEFAULT_THEME) || 'dark';
+    if (stored.fixation === undefined) seed.fixation = (FR && FR.DEFAULT_FIXATION) || 'optimal';
+    if (stored.saccade === undefined) seed.saccade = (FR && FR.DEFAULT_SACCADE) || 'optimal';
+    if (Object.keys(seed).length > 0) {
+      await chrome.storage.sync.set(seed);
     }
   } catch (_) {}
   // Enforce red book icon everywhere (toolbar + store listings use manifest,

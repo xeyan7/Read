@@ -3,6 +3,24 @@
  * borders, Geist + Geist Mono, one quiet accent for "on" signals.
  */
 
+@property --wb-weight {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 750;
+}
+
+@property --wb-stroke {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --wb-boost {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -32,37 +50,41 @@
   --r-ctrl: 9px;
   --r-inner: 7px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-morph: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #F2F2F3;
+  --bg: #EBEBED;
   --surface: #FFFFFF;
-  --surface-2: #EDEDEF;
-  --border: rgba(0, 0, 0, 0.09);
-  --border-strong: rgba(0, 0, 0, 0.18);
+  --surface-2: #E8E8EB;
+  --border: rgba(17, 17, 19, 0.1);
+  --border-strong: rgba(17, 17, 19, 0.18);
 
-  --ink: #0A0A0A;
-  --ink-2: #3A3A3C;
-  --muted: #6B6B70;
-  --faint: #9C9CA1;
+  --ink: #131316;
+  --ink-2: #4A4A4F;
+  --muted: #6D6D73;
+  --faint: #A3A3A9;
 
-  --primary: #0A0A0A;
+  --primary: #131316;
   --primary-ink: #FFFFFF;
-  --primary-hover: #262626;
+  --primary-hover: #26262B;
 
   --accent: #1F8A57;
   --danger: #B4232C;
 
+  --well: #E3E3E8;
+  --well-ink: #62626A;
+
   /* Elevation — see popup.css for rationale */
   --shadow-card:
-    0 0 0 0.5px rgba(0, 0, 0, 0.02),
-    0 1px 2px rgba(16, 16, 20, 0.04),
-    0 8px 24px -10px rgba(16, 16, 20, 0.12);
-  --shadow-ctrl: 0 1px 2px rgba(16, 16, 20, 0.06), inset 0 1px 0 #FFFFFF;
-  --shadow-well: inset 0 1px 2px rgba(16, 16, 20, 0.06);
-  --sheen: linear-gradient(180deg, #FFFFFF 0%, #FCFCFD 100%);
+    0 0 0 0.5px rgba(17, 17, 19, 0.04),
+    0 1px 2px rgba(17, 17, 20, 0.06),
+    0 10px 24px -12px rgba(17, 17, 20, 0.18);
+  --shadow-ctrl: 0 1px 2px rgba(17, 17, 20, 0.07), inset 0 1px 0 #FFFFFF;
+  --shadow-well: inset 0 1px 3px rgba(17, 17, 20, 0.1), inset 0 0 0 1px rgba(17, 17, 19, 0.03);
+  --sheen: linear-gradient(180deg, #FFFFFF 0%, #F6F6F7 100%);
 }
 
 * {
@@ -481,11 +503,11 @@ select:focus-visible {
 }
 
 :root[data-theme="light"] .seg-thumb {
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.20);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px) saturate(160%);
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  background: #FFFFFF;
+  border: 1px solid rgba(17, 17, 19, 0.08);
+  box-shadow: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(17, 17, 20, 0.1), 0 4px 10px -2px rgba(17, 17, 20, 0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .seg-item {
@@ -548,15 +570,31 @@ select:focus-visible {
   font-size: 14px;
   line-height: 1.65;
   color: var(--ink-2);
+  contain: layout style;
+  transform: translateZ(0);
+  transition: --wb-weight 0.55s var(--ease-morph),
+              --wb-stroke 0.55s var(--ease-morph),
+              --wb-boost 0.55s var(--ease-morph),
+              -webkit-text-stroke-width 0.55s var(--ease-morph);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.preview-sample.is-morphing {
+  will-change: --wb-weight, --wb-stroke, --wb-boost;
 }
 
 .preview-sample .wb {
   font-weight: var(--wb-weight, 700);
+  font-variation-settings: 'wght' var(--wb-weight, 700);
   color: var(--ink);
-  text-shadow: 0 0 0 transparent;
+  text-shadow: 0 0 calc(var(--wb-boost, 0) * 3.5px) currentColor, 0 0 calc(var(--wb-boost, 0) * 1px) currentColor;
   -webkit-text-stroke-width: var(--wb-stroke, 0px);
   -webkit-text-stroke-color: currentColor;
-  transition: font-weight 0.35s var(--ease), -webkit-text-stroke-width 0.35s var(--ease);
+  letter-spacing: 0px;
+  /* Instant follow — container glide drives the morph at 60fps. */
+  transition: none;
 }
 
 /* ---------- Studio ---------- */
@@ -643,16 +681,24 @@ select:focus-visible {
   line-height: 1.75;
   color: var(--ink-2);
   max-width: 64ch;
+  /* No glide here on purpose: dozens of anchors animating stroke /
+   * shadow together jank. Strength still applies instantly while the
+   * small preview above morphs smoothly. */
+  transition: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .studio-paragraph .extension-adhd-reader-boldify,
 .studio-paragraph .focus-reader-bold {
   font-weight: var(--wb-weight, 700);
+  font-variation-settings: 'wght' var(--wb-weight, 700);
   color: var(--ink);
-  text-shadow: 0 0 0 transparent;
+  text-shadow: 0 0 calc(var(--wb-boost, 0) * 3.5px) currentColor, 0 0 calc(var(--wb-boost, 0) * 1px) currentColor;
   -webkit-text-stroke-width: var(--wb-stroke, 0px);
   -webkit-text-stroke-color: currentColor;
-  transition: font-weight 0.35s var(--ease), -webkit-text-stroke-width 0.35s var(--ease);
+  letter-spacing: 0px;
+  transition: none;
 }
 
 .metrics {
@@ -986,26 +1032,42 @@ select:focus-visible {
 :root[data-theme="light"] .studio-viewport,
 :root[data-theme="light"] .input,
 :root[data-theme="light"] .select {
-  background: #F4F4F5;
+  background: var(--well);
+  border-color: rgba(17, 17, 19, 0.08);
   box-shadow: var(--shadow-well);
 }
 
 :root[data-theme="light"] .input:focus,
 :root[data-theme="light"] .select:focus {
-  background: var(--surface);
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+  background: #fff;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(17, 17, 19, 0.08);
 }
 
 :root[data-theme="light"] .seg-thumb {
   background: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(17, 17, 19, 0.07);
   box-shadow:
-    0 1px 2px rgba(16, 16, 20, 0.08),
-    0 3px 8px -2px rgba(16, 16, 20, 0.10);
+    inset 0 1px 0 #FFFFFF,
+    0 1px 2px rgba(17, 17, 20, 0.1),
+    0 4px 10px -2px rgba(17, 17, 20, 0.16);
 }
 
 :root[data-theme="light"] .chip {
-  background: #F7F7F8;
+  background: #EFEFF1;
+  border-color: rgba(17, 17, 19, 0.08);
+  color: #55555C;
+}
+
+:root[data-theme="light"] .preview-sample,
+:root[data-theme="light"] .studio-paragraph {
+  color: var(--well-ink);
+}
+
+:root[data-theme="light"] .preview-sample .wb,
+:root[data-theme="light"] .studio-paragraph .extension-adhd-reader-boldify,
+:root[data-theme="light"] .studio-paragraph .focus-reader-bold {
+  color: #000000;
 }
 
 :root[data-theme="light"] .topic-chip {

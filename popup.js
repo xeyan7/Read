@@ -176,7 +176,7 @@ async function initPopup() {
     });
   }
 
-  function renderIntensity() {
+  function renderIntensity(instant = false) {
     const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[state.intensity] : 750;
     const boost = FocusReader && FocusReader.boostFor ? FocusReader.boostFor(state.intensity) : 0;
     const stroke = FocusReader && FocusReader.strokeFor ? FocusReader.strokeFor(state.intensity) : 0;
@@ -184,7 +184,8 @@ async function initPopup() {
     if (dockVal) dockVal.textContent = label;
     if (previewSample) {
       if (FocusReader && FocusReader.morphPreview) {
-        FocusReader.morphPreview(previewSample, weight, boost, stroke);
+        // First paint applies instantly (no glide on open); user clicks glide.
+        FocusReader.morphPreview(previewSample, weight, boost, stroke, instant ? { instant: true } : undefined);
       } else {
         previewSample.style.setProperty('--wb-weight', String(weight));
         previewSample.style.setProperty('--wb-boost', String(boost));
@@ -223,6 +224,24 @@ async function initPopup() {
       .replace(/^[a-zA-Z]+:\/\//, '')
       .replace(/\/.*$/, '')
       .trim();
+  }
+
+  // Both spellings of a host so www / bare rules stay in sync. Storage keys
+  // keep the exact host, but lookups and cleanup consider both variants.
+  function hostVariants(host) {
+    if (!host) return [];
+    const lower = String(host).toLowerCase();
+    if (lower.startsWith('www.')) return [lower, lower.slice(4)];
+    return [lower, `www.${lower}`];
+  }
+
+  function isSameSite(a, b) {
+    if (!a || !b) return false;
+    const al = String(a).toLowerCase();
+    const bl = String(b).toLowerCase();
+    if (al === bl) return true;
+    const av = hostVariants(al);
+    return av.includes(bl);
   }
 
   // Site list follows the activation mode: automatic shows exclusions
@@ -294,7 +313,7 @@ async function initPopup() {
         } catch (err) {
           console.warn('Could not remove site rule:', err);
         }
-        if (host === state.host) {
+        if (isSameSite(host, state.host)) {
           state.override = false;
           state.active = state.mode !== 'manual';
           render();
@@ -356,6 +375,10 @@ async function initPopup() {
       const nextIntensity = FocusReader.normalizeIntensity(btn.dataset.intensity);
       if (state.intensity === nextIntensity) return;
       state.intensity = nextIntensity;
+      if (previewSample && !previewSample.classList.contains('is-active')) {
+        previewSample.classList.add('is-active');
+        if (previewState) previewState.textContent = 'Bionic';
+      }
       renderIntensity();
       try {
         await chrome.storage.sync.set({ intensity: nextIntensity });
@@ -406,7 +429,7 @@ async function initPopup() {
         console.error('Failed to save site rule:', err);
         return;
       }
-      if (host === state.host) {
+      if (isSameSite(host, state.host)) {
         state.override = true;
         state.active = action;
         render();
@@ -436,6 +459,13 @@ async function initPopup() {
   try {
     const { theme } = await chrome.storage.sync.get(['theme']);
     document.documentElement.dataset.theme = normalizeTheme(theme);
+    // First run shows dark via markup, but persist it so the choice is saved
+    // and later reopens restore the same theme.
+    if (theme === undefined) {
+      try {
+        await chrome.storage.sync.set({ theme: normalizeTheme(theme) });
+      } catch (_) {}
+    }
   } catch (_) {}
 
   if (themeToggle) {
@@ -481,7 +511,14 @@ async function initPopup() {
           if (state.override) {
             await chrome.storage.sync.set({ [state.host]: next });
           } else {
-            await chrome.storage.sync.remove(state.host);
+            // Clear both www and bare variants so a rule stored under either
+            // spelling is removed when returning to the mode default.
+            const variants = hostVariants(state.host);
+            if (variants.length) {
+              await chrome.storage.sync.remove(variants);
+            } else {
+              await chrome.storage.sync.remove(state.host);
+            }
           }
         } catch (e) {
           console.error('Storage save failed:', e);
@@ -490,7 +527,8 @@ async function initPopup() {
     });
   }
 
-  // --- Load Saved Preferences ---
+  // --- Load Saved Preferences (and seed first-run defaults so reopening
+  // restores light / medium / strong exactly as left) ---
   try {
     const stored = await chrome.storage.sync.get(['intensity', 'fixation', 'saccade', 'mode']);
     if (stored && stored.intensity) {
@@ -505,11 +543,22 @@ async function initPopup() {
     if (stored && stored.mode && FocusReader.normalizeMode) {
       state.mode = FocusReader.normalizeMode(stored.mode);
     }
+    // Persist defaults on first run without overwriting user choices.
+    const seed = {};
+    if (!stored || stored.intensity === undefined) seed.intensity = state.intensity;
+    if (!stored || stored.fixation === undefined) seed.fixation = state.fixation;
+    if (!stored || stored.saccade === undefined) seed.saccade = state.saccade;
+    if (!stored || stored.mode === undefined) seed.mode = state.mode;
+    if (Object.keys(seed).length > 0) {
+      try {
+        await chrome.storage.sync.set(seed);
+      } catch (_) {}
+    }
   } catch (err) {
     console.warn('Could not read saved preferences:', err);
   }
 
-  renderIntensity();
+  renderIntensity(true);
   renderMode();
   await loadSiteRules();
   updatePreviewSentence(SAMPLE_SENTENCES[sampleIndex]);
@@ -547,15 +596,17 @@ async function initPopup() {
   }
 
   try {
-    state.host = new URL(tab.url).host;
+    state.host = new URL(tab.url).host.toLowerCase();
   } catch {
-    state.host = tab.url;
+    state.host = String(tab.url || '').toLowerCase();
   }
 
-  // --- Check Explicit Host Preference ---
+  // --- Check Explicit Host Preference (www-aware: example.com === www.example.com) ---
   try {
-    const stored = await chrome.storage.sync.get([state.host]);
-    state.override = stored[state.host] !== undefined;
+    const hostState = FocusReader && FocusReader.shouldBeActiveForUrl
+      ? await FocusReader.shouldBeActiveForUrl(tab.url)
+      : (await chrome.storage.sync.get([state.host]))[state.host];
+    state.override = hostState !== undefined;
   } catch (err) {
     console.warn('Could not read host preference:', err);
   }
@@ -568,13 +619,24 @@ async function initPopup() {
   }
   if (!state.reachable) {
     try {
-      const { mode, [state.host]: hostPref } = await chrome.storage.sync.get(['mode', state.host]);
-      if (mode && FocusReader && FocusReader.normalizeMode) {
-        state.mode = FocusReader.normalizeMode(mode);
-        renderMode();
+      if (FocusReader && FocusReader.resolveActive) {
+        const { mode } = await chrome.storage.sync.get(['mode']);
+        if (mode && FocusReader.normalizeMode) {
+          state.mode = FocusReader.normalizeMode(mode);
+          renderMode();
+        }
+        const hostState = await FocusReader.shouldBeActiveForUrl(tab.url);
+        state.override = hostState !== undefined;
+        state.active = await FocusReader.resolveActive(tab.url, state.mode);
+      } else {
+        const { mode, [state.host]: hostPref } = await chrome.storage.sync.get(['mode', state.host]);
+        if (mode && FocusReader && FocusReader.normalizeMode) {
+          state.mode = FocusReader.normalizeMode(mode);
+          renderMode();
+        }
+        state.active = hostPref !== undefined ? hostPref === true : state.mode !== 'manual';
+        state.override = hostPref !== undefined;
       }
-      state.active = hostPref !== undefined ? hostPref === true : state.mode !== 'manual';
-      state.override = hostPref !== undefined;
     } catch (_) {
       state.active = true;
     }

@@ -114,7 +114,7 @@ async function initOptions() {
     document.querySelectorAll('.segmented').forEach(moveSegThumb);
   }
 
-  function renderIntensity() {
+  function renderIntensity(instant = false) {
     segItems.forEach((item) => {
       const isMatch = item.dataset.intensity === currentIntensity;
       item.classList.toggle('is-selected', isMatch);
@@ -124,11 +124,13 @@ async function initOptions() {
     const weight = FocusReader && FocusReader.INTENSITY_WEIGHTS ? FocusReader.INTENSITY_WEIGHTS[currentIntensity] : 750;
     const boost = FocusReader && FocusReader.boostFor ? FocusReader.boostFor(currentIntensity) : 0;
     const stroke = FocusReader && FocusReader.strokeFor ? FocusReader.strokeFor(currentIntensity) : 0;
-    const targets = [preview, studioParagraph].filter(Boolean);
     if (FocusReader && FocusReader.morphPreview) {
-      FocusReader.morphPreview(targets, weight, boost, stroke);
+      // Small preview glides at 60fps; the long studio paragraph applies
+      // instantly so dozens of anchors don't jank the morph.
+      if (preview) FocusReader.morphPreview(preview, weight, boost, stroke, instant ? { instant: true } : undefined);
+      if (studioParagraph) FocusReader.morphPreview(studioParagraph, weight, boost, stroke, { instant: true });
     } else {
-      targets.forEach((el) => {
+      [preview, studioParagraph].filter(Boolean).forEach((el) => {
         el.style.setProperty('--wb-weight', String(weight));
         el.style.setProperty('--wb-boost', String(boost));
         el.style.setProperty('--wb-stroke', `${stroke}px`);
@@ -140,39 +142,50 @@ async function initOptions() {
     moveSegThumb(document.getElementById('intensityGroup'));
   }
 
-  const INTENSITY_SAMPLE = 'I read fast to focus attention and boost reading comprehension.';
+  // Fixed [line1, line2] pair so words-per-line stay identical on every strength
+  // and prevent layout reflow during weight morphing
+  const INTENSITY_SAMPLE = [
+    'I read fast to focus attention',
+    'and boost reading comprehension.',
+  ];
 
   function renderIntensityPreview() {
     if (!preview) return;
     preview.innerHTML = '';
-    const words = INTENSITY_SAMPLE.split(/\s+/g);
-    words.forEach((word, idx) => {
-      if (idx > 0) preview.appendChild(document.createTextNode(' '));
-      const match = word.match(/^([^a-zA-Z0-9\u00C0-\u024F]*)([\s\S]*?)([^a-zA-Z0-9\u00C0-\u024F]*)$/);
-      const prefix = match ? match[1] : '';
-      const core = match ? match[2] : word;
-      const suffix = match ? match[3] : '';
-      if (!core || !isNaN(core) || !isNaN(core.slice(0, 1))) {
-        preview.appendChild(document.createTextNode(word));
-        return;
-      }
-      const shouldBold = FocusReader && FocusReader.shouldBoldWord
-        ? FocusReader.shouldBoldWord(core, { saccade: currentSaccade, index: idx })
-        : true;
-      const boldLen = shouldBold && FocusReader && FocusReader.calculateBoldLength
-        ? FocusReader.calculateBoldLength(core, currentFixation)
-        : 0;
-      if (prefix) preview.appendChild(document.createTextNode(prefix));
-      if (boldLen >= 1) {
-        const span = document.createElement('span');
-        span.className = 'wb';
-        span.textContent = core.slice(0, boldLen);
-        preview.appendChild(span);
-        preview.appendChild(document.createTextNode(core.slice(boldLen)));
-      } else {
-        preview.appendChild(document.createTextNode(core));
-      }
-      if (suffix) preview.appendChild(document.createTextNode(suffix));
+    const lines = Array.isArray(INTENSITY_SAMPLE) ? INTENSITY_SAMPLE : [INTENSITY_SAMPLE];
+    let wordCount = 0;
+    lines.forEach((line, li) => {
+      if (li > 0) preview.appendChild(document.createElement('br'));
+      line.split(/\s+/g).forEach((word, idx) => {
+        if (!word) return;
+        if (idx > 0) preview.appendChild(document.createTextNode(' '));
+        const match = word.match(/^([^a-zA-Z0-9\u00C0-\u024F]*)([\s\S]*?)([^a-zA-Z0-9\u00C0-\u024F]*)$/);
+        const prefix = match ? match[1] : '';
+        const core = match ? match[2] : word;
+        const suffix = match ? match[3] : '';
+        if (!core || !isNaN(core) || !isNaN(core.slice(0, 1))) {
+          preview.appendChild(document.createTextNode(word));
+          return;
+        }
+        const shouldBold = FocusReader && FocusReader.shouldBoldWord
+          ? FocusReader.shouldBoldWord(core, { saccade: currentSaccade, index: wordCount })
+          : true;
+        wordCount++;
+        const boldLen = shouldBold && FocusReader && FocusReader.calculateBoldLength
+          ? FocusReader.calculateBoldLength(core, currentFixation)
+          : 0;
+        if (prefix) preview.appendChild(document.createTextNode(prefix));
+        if (boldLen >= 1) {
+          const span = document.createElement('span');
+          span.className = 'wb';
+          span.textContent = core.slice(0, boldLen);
+          preview.appendChild(span);
+          preview.appendChild(document.createTextNode(core.slice(boldLen)));
+        } else {
+          preview.appendChild(document.createTextNode(core));
+        }
+        if (suffix) preview.appendChild(document.createTextNode(suffix));
+      });
     });
   }
 
@@ -252,7 +265,7 @@ async function initOptions() {
 
     try {
       const allStorage = await chrome.storage.sync.get(null);
-      const systemKeys = new Set(['mode', 'intensity', 'theme']);
+      const systemKeys = new Set(['mode', 'intensity', 'fixation', 'saccade', 'theme']);
       const hostRules = Object.entries(allStorage || {}).filter(
         ([key, val]) => !systemKeys.has(key) && typeof val === 'boolean'
       );
@@ -335,6 +348,9 @@ async function initOptions() {
   }
 
   // --- Load saved preferences (default: always-active on all sites) -----------
+  // First run shows dark theme + medium strength via markup; persist those
+  // defaults so reopening restores exactly what was left (light stays light,
+  // strong stays strong).
   try {
     const res = await chrome.storage.sync.get(['mode', 'intensity', 'fixation', 'saccade']);
     currentMode = FocusReader ? FocusReader.normalizeMode(res && res.mode) : (res && res.mode === 'manual' ? 'manual' : 'automatic');
@@ -347,12 +363,22 @@ async function initOptions() {
     if (res && res.saccade !== undefined && FocusReader && FocusReader.normalizeSaccade) {
       currentSaccade = FocusReader.normalizeSaccade(res.saccade);
     }
+    const seed = {};
+    if (!res || res.mode === undefined) seed.mode = currentMode;
+    if (!res || res.intensity === undefined) seed.intensity = currentIntensity;
+    if (!res || res.fixation === undefined) seed.fixation = currentFixation;
+    if (!res || res.saccade === undefined) seed.saccade = currentSaccade;
+    if (Object.keys(seed).length > 0) {
+      try {
+        await chrome.storage.sync.set(seed);
+      } catch (_) {}
+    }
   } catch (err) {
     console.warn('Could not read storage:', err);
   }
 
   renderMode();
-  renderIntensity();
+  renderIntensity(true);
   renderFixation();
   renderSaccade();
   renderIntensityPreview();
@@ -496,6 +522,11 @@ async function initOptions() {
     const initial = FocusReader ? FocusReader.normalizeTheme(theme) : (theme || 'dark');
     document.documentElement.dataset.theme = initial;
     renderThemePicker(initial);
+    if (theme === undefined) {
+      try {
+        await chrome.storage.sync.set({ theme: initial });
+      } catch (_) {}
+    }
   } catch (_) {}
 
   if (themeToggle) {
