@@ -8,7 +8,11 @@
 
 'use strict';
 
-var FocusReader = globalThis.FocusReader || {
+// Re-injection safe: no top-level let/const/class — re-running this file
+// (e.g. manual extension reload re-injecting shared.js into a tab that
+// already has it) only re-assigns the same object reference instead of
+// throwing "FocusReader has already been declared".
+globalThis.FocusReader = globalThis.FocusReader || {
   STYLE_ID: 'adhdReaderStyleTag',
   LEGACY_STYLE_ID: 'focusReaderStyleTag',
 
@@ -32,20 +36,24 @@ var FocusReader = globalThis.FocusReader || {
   /* Applied weights use calibrated font faces:
    * Light = 600 (semi-bold, calm and low-contrast for prolonged reading),
    * Medium = 750 (bold, balanced daily reading),
-   * Strong = 825 (extra-bold/heavy, authoritative punchy presence).
+   * Strong = 900 (black, maximum punch — clearly visible even as white
+   * on black where weight alone looks subtle).
    * Clear, distinct visual separation between all three tiers. */
-  INTENSITY_WEIGHTS: { light: 600, medium: 750, strong: 825 },
+  INTENSITY_WEIGHTS: { light: 600, medium: 750, strong: 900 },
 
   /* Displayed weights matching the applied font weights. */
-  INTENSITY_DISPLAY_WEIGHTS: { light: 600, medium: 750, strong: 825 },
+  INTENSITY_DISPLAY_WEIGHTS: { light: 600, medium: 750, strong: 900 },
 
   /* Faux-bold boost per strength as a 0..1 alpha: a zero-blur text-shadow
-   * whose alpha ramps with intensity. Distinct step between medium and strong. */
-  INTENSITY_BOOST: { light: 0, medium: 0.08, strong: 0.18 },
+   * whose alpha ramps with intensity. Strong glows enough to lift off dim
+   * body text on black without blowing out to blobs. */
+  INTENSITY_BOOST: { light: 0, medium: 0.08, strong: 0.22 },
 
   /* Continuous faux-bold stroke (px) per strength. Interpolates smoothly.
-   * Light (0px), Medium (0.05px), Strong (0.12px) provide clear tactile contrast. */
-  INTENSITY_STROKE: { light: 0, medium: 0.05, strong: 0.12 },
+   * Light (0px), Medium (0.15px), Strong (0.4px) — gaps are deliberately
+   * wide so each step reads clearly even on white, where weight alone
+   * snaps between faces. */
+  INTENSITY_STROKE: { light: 0, medium: 0.15, strong: 0.4 },
 
   /* UI color themes: minimal monochrome dark (default) and light. */
   THEMES: ['dark', 'light'],
@@ -226,7 +234,14 @@ var FocusReader = globalThis.FocusReader || {
    * Var-driven so BOTH previews and live websites glide: the rule itself
    * never changes between strengths — only the three --wb-* vars move, and
    * their CSS transition (+ WAAPI glide in morphPreview) interpolates them
-   * at 60fps. Hardcoding numbers per strength would snap. */
+   * at 60fps. Hardcoding numbers per strength would snap.
+   * Light pages ([data-fr-bg="light"], set by content.js from the body
+   * background) get crisp weight-only bold — stroke/glow/brightness look
+   * muddy as black-on-white (override sets filter:none below). Dark pages
+   * keep the full pop: brightness lift scales with strength so Light
+   * (≈1.18x, clearly lifted off dim body text), Medium (≈1.28x) and
+   * Strong (≈1.59x) read as distinct steps even when weight alone
+   * looks subtle as white-on-black. */
   styleRuleFor(intensity) {
     const key = FocusReader.normalizeIntensity(intensity);
     const weight = FocusReader.INTENSITY_WEIGHTS[key];
@@ -234,6 +249,7 @@ var FocusReader = globalThis.FocusReader || {
     const stroke = FocusReader.strokeFor(key);
     const ease = FocusReader.MORPH_EASING || 'cubic-bezier(0.22, 1, 0.36, 1)';
     const ms = FocusReader.MORPH_MS || 550;
+    const boldSel = `.${FocusReader.BOLD_CLASS}, .${FocusReader.LEGACY_BOLD_CLASS}`;
     return (
       `@property --wb-weight{syntax:'<number>';inherits:true;initial-value:750;}` +
       `@property --wb-stroke{syntax:'<length>';inherits:true;initial-value:0px;}` +
@@ -241,12 +257,16 @@ var FocusReader = globalThis.FocusReader || {
       `:root{--wb-weight:${weight};--wb-boost:${boost};--wb-stroke:${stroke}px;` +
       `transition:--wb-weight ${ms}ms ${ease},--wb-stroke ${ms}ms ${ease},--wb-boost ${ms}ms ${ease},` +
       `-webkit-text-stroke-width ${ms}ms ${ease};}` +
-      `.${FocusReader.BOLD_CLASS}, .${FocusReader.LEGACY_BOLD_CLASS} { ` +
+      `${boldSel} { ` +
       `font-weight: var(--wb-weight, ${weight}); ` +
       `font-variation-settings: 'wght' var(--wb-weight, ${weight}); ` +
       `color: inherit; ` +
       `text-shadow: 0 0 calc(var(--wb-boost, ${boost}) * 3.5px) currentColor, 0 0 calc(var(--wb-boost, ${boost}) * 1px) currentColor; ` +
-      `-webkit-text-stroke-width: var(--wb-stroke, ${stroke}px); -webkit-text-stroke-color: currentColor; }`
+      `paint-order: stroke fill; ` +
+      `filter: brightness(calc(1.18 + var(--wb-boost, ${boost}) * 1.2)); ` +
+      `-webkit-text-stroke-width: var(--wb-stroke, ${stroke}px); -webkit-text-stroke-color: currentColor; }` +
+      `html[data-fr-bg="light"] ${boldSel} { ` +
+      `-webkit-text-stroke-width: var(--wb-stroke, ${stroke}px); text-shadow: none; filter: none; paint-order: stroke fill; }`
     );
   },
 
@@ -291,7 +311,7 @@ var FocusReader = globalThis.FocusReader || {
 
   /* Preview + website morph duration in ms. Must match the CSS transition on
    * .preview-sample / :root (--wb-weight / --wb-stroke / --wb-boost)
-   * in popup.css + options.css + content pages. ~550ms with an expo-out
+   * in popup.css + content pages. ~550ms with an expo-out
    * curve reads as a deliberate buttery glide rather than a snap. */
   MORPH_MS: 550,
   MORPH_EASING: 'cubic-bezier(0.22, 1, 0.36, 1)',
@@ -363,7 +383,7 @@ var FocusReader = globalThis.FocusReader || {
     return {
       w: Number.isFinite(w) ? w : 750,
       b: Number.isFinite(b) ? b : 0.08,
-      s: s !== undefined ? s : 0.05,
+      s: s !== undefined ? s : 0.15,
     };
   },
 
@@ -380,7 +400,7 @@ var FocusReader = globalThis.FocusReader || {
   /**
    * Morph preview bolding to the given weight / boost / stroke.
    * Writes --wb-weight, --wb-boost and --wb-stroke on each container and lets
-   * the CSS transition (popup.css / options.css) interpolate them, so Light /
+   * the CSS transition (popup.css) interpolate them, so Light /
    * Medium / Strong visibly glide instead of snapping. Accepts either
    *   morphPreview(el, weight, boost, stroke, opts)
    * or the legacy
@@ -711,7 +731,70 @@ var FocusReader = globalThis.FocusReader || {
   },
 
   /**
-   * Per-host on/off check with www/base domain normalization.
+   * Normalize a hostname for rule matching: lowercase, no trailing dot,
+   * no port. Bracketed IPv6 keeps its brackets.
+   */
+  normalizeHostname(host) {
+    let h = String(host || '').trim().toLowerCase();
+    if (h.endsWith('.')) h = h.slice(0, -1);
+    if (!h) return '';
+    if (h.startsWith('[')) {
+      const end = h.indexOf(']');
+      return end >= 0 ? h.slice(0, end + 1) : h;
+    }
+    const first = h.indexOf(':');
+    if (first >= 0 && h.indexOf(':', first + 1) < 0) {
+      return h.slice(0, first);
+    }
+    return h;
+  },
+
+  /** True for IP literals — parent-domain walking never applies to them. */
+  isIpHost(host) {
+    const h = String(host || '');
+    if (!h) return false;
+    if (h.startsWith('[')) return true;
+    return /^\d+\.\d+\.\d+\.\d+$/.test(h);
+  },
+
+  /**
+   * Ordered rule-lookup keys for a host, most specific first: the exact
+   * host, then each parent domain (so a rule on XYZ.com also governs
+   * sub.XYZ.com and deep.sub.XYZ.com), each followed by its www. twin
+   * for legacy www <-> bare equivalence. Never walks above a two-label
+   * domain or into IP literals. A more specific stored rule always wins
+   * because it is checked first.
+   */
+  domainCandidates(host) {
+    const out = [];
+    const push = (h) => {
+      if (h && !out.includes(h)) out.push(h);
+    };
+    let raw = String(host || '').trim().toLowerCase();
+    if (raw.endsWith('.')) raw = raw.slice(0, -1);
+    if (!raw) return out;
+    push(raw);
+    const norm = FocusReader.normalizeHostname(raw);
+    push(norm);
+    if (FocusReader.isIpHost(norm)) {
+      push(norm.startsWith('www.') ? norm.slice(4) : `www.${norm}`);
+      return out;
+    }
+    const parts = norm.split('.');
+    for (let i = 1; i < parts.length; i += 1) {
+      const cand = parts.slice(i).join('.');
+      if (!cand.includes('.')) break;
+      push(cand);
+    }
+    for (const base of out.slice()) {
+      push(base.startsWith('www.') ? base.slice(4) : `www.${base}`);
+    }
+    return out;
+  },
+
+  /**
+   * Per-host on/off check with subdomain inheritance: a rule stored for
+   * XYZ.com also applies to sub.XYZ.com (most-specific stored rule wins).
    * Storage shape: { "<hostname>": true/false }.
    * Returns true (explicit on), false (explicit off), undefined (no pref).
    * Exact match to E:Read `shouldBeActiveValidation`.
@@ -724,13 +807,9 @@ var FocusReader = globalThis.FocusReader || {
     } catch {
       return undefined;
     }
+    const keys = FocusReader.domainCandidates(host);
+    if (!keys.length) return undefined;
     try {
-      const keys = [host];
-      if (host.startsWith('www.')) {
-        keys.push(host.slice(4));
-      } else {
-        keys.push(`www.${host}`);
-      }
       const stored = await chrome.storage.sync.get(keys);
       for (const k of keys) {
         if (stored[k] === true) return true;
@@ -751,6 +830,10 @@ var FocusReader = globalThis.FocusReader || {
     return mode !== 'manual';
   },
 };
+
+// Lexical alias for the method bodies above. `var` (not let/const) so a
+// second evaluation in the same realm re-declares harmlessly.
+var FocusReader = globalThis.FocusReader;
 
 // Aliases for 100% E:Read module 563 drop-in compatibility
 FocusReader.shouldBeActiveValidation = FocusReader.shouldBeActiveForUrl;

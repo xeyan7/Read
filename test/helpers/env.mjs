@@ -1,6 +1,6 @@
 /* test/helpers/env.mjs
  * A tiny jsdom harness that loads the extension's plain scripts (shared.js,
- * content.js, popup.js, options.js) the same way a browser would, with a fake
+ * content.js, popup.js) the same way a browser would, with a fake
  * `chrome` API. No bundling, no transpiling — what runs in tests is the same
  * source that ships.
  */

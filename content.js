@@ -47,6 +47,58 @@ if (!globalThis.__focusReaderContentLoaded) {
       return { weight: w, boost: b, stroke: s };
     }
 
+    // Page tone: light backgrounds get crisp weight-only bold (stroke and
+    // glow look muddy as black-on-white). Dark pages keep the full pop.
+    // Detected from the body background luminance; stored as
+    // <html data-fr-bg="light|dark"> which styleRuleFor keys off.
+    function detectPageTone() {
+      try {
+        const root = document.documentElement;
+        if (!root) return 'dark';
+        let bg = '';
+        try {
+          const cs = window.getComputedStyle(document.body || root);
+          bg = (cs && cs.backgroundColor) || '';
+        } catch (_) {}
+        const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(bg || '');
+        if (!m) {
+          // Transparent / image bg: fall back to color-scheme hint.
+          try {
+            const sc = window.getComputedStyle(root).colorScheme || '';
+            if (/light/i.test(sc)) return 'light';
+          } catch (_) {}
+          return 'dark';
+        }
+        const r = Number(m[1]);
+        const g = Number(m[2]);
+        const b = Number(m[3]);
+        let a = 1;
+        const am = /rgba?\([^)]*\/\s*([\d.]+)\s*\)|,\s*([\d.]+)\s*\)/.exec(bg);
+        if (am) a = Number(am[1] || am[2]);
+        if (Number.isFinite(a) && a < 0.5) return 'dark';
+        // Relative luminance (WCAG).
+        const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+        return lum > 0.6 ? 'light' : 'dark';
+      } catch (_) {
+        return 'dark';
+      }
+    }
+
+    function syncPageTone() {
+      try {
+        const tone = detectPageTone();
+        const root = document.documentElement;
+        if (root) {
+          if (root.getAttribute('data-fr-bg') !== tone) {
+            root.setAttribute('data-fr-bg', tone);
+          }
+        }
+        return tone;
+      } catch (_) {
+        return 'dark';
+      }
+    }
+
     function setActive(on) {
       const tag = ensureStyleTag();
       if (!on) {
@@ -54,6 +106,7 @@ if (!globalThis.__focusReaderContentLoaded) {
         tag.innerHTML = '';
         return;
       }
+      syncPageTone();
       // Static var-driven rule (rewritten only when off -> on). Strength
       // itself lives in <html> inline vars and glides via morphPreview.
       const rule = FocusReader.styleRuleFor(intensity);
@@ -234,6 +287,8 @@ if (!globalThis.__focusReaderContentLoaded) {
       applySaccade,
       refreshActive,
       decideActive,
+      detectPageTone,
+      syncPageTone,
       get intensity() {
         return intensity;
       },
@@ -291,7 +346,7 @@ if (!globalThis.__focusReaderContentLoaded) {
     }
   });
 
-  // Live updates from options / popup
+  // Live updates from popup
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.intensity) FocusReaderContent.applyIntensity(changes.intensity.newValue);
     if (changes.fixation) FocusReaderContent.applyFixation(changes.fixation.newValue);

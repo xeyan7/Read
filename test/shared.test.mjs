@@ -1,7 +1,7 @@
 /* Unit tests for shared.js — the pure bionic-reading engine + host prefs. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPage, textOf } from './helpers/env.mjs';
+import { createPage, readSource, textOf } from './helpers/env.mjs';
 
 function loadEngine(storage = {}) {
   const page = createPage({ scripts: ['shared.js'], storage });
@@ -209,6 +209,61 @@ test('shouldBeActiveForUrl resolves subdomains with www fallback', async () => {
   assert.equal(await wwwStored.FR.shouldBeActiveForUrl('https://nyt.com/story'), false);
 });
 
+test('shouldBeActiveForUrl inherits parent-domain rules on subdomains', async () => {
+  // A rule on XYZ.com governs sub.XYZ.com and deeper chains.
+  const off = loadEngine({ 'example.com': false });
+  assert.equal(await off.FR.shouldBeActiveForUrl('https://example.com/'), false);
+  assert.equal(await off.FR.shouldBeActiveForUrl('https://sub.example.com/page'), false);
+  assert.equal(await off.FR.shouldBeActiveForUrl('https://deep.sub.example.com/page'), false);
+  assert.equal(await off.FR.shouldBeActiveForUrl('https://www.sub.example.com/page'), false);
+
+  const on = loadEngine({ 'example.com': true });
+  assert.equal(await on.FR.shouldBeActiveForUrl('https://sub.example.com/page'), true);
+  assert.equal(await on.FR.shouldBeActiveForUrl('https://example.com/'), true);
+
+  // Most-specific stored rule wins over a parent rule.
+  const mixed = loadEngine({ 'example.com': false, 'sub.example.com': true });
+  assert.equal(await mixed.FR.shouldBeActiveForUrl('https://sub.example.com/page'), true);
+  assert.equal(await mixed.FR.shouldBeActiveForUrl('https://other.example.com/page'), false);
+  assert.equal(await mixed.FR.shouldBeActiveForUrl('https://example.com/'), false);
+
+  // Suffix lookalikes are NOT subdomains (dot-boundary required).
+  const tricky = loadEngine({ 'example.com': false });
+  assert.equal(await tricky.FR.shouldBeActiveForUrl('https://notexample.com/'), undefined);
+  assert.equal(await tricky.FR.shouldBeActiveForUrl('https://example.com.evil.com/'), undefined);
+
+  // Normalization: case, trailing dot, and ports.
+  const norm = loadEngine({ 'example.com': false });
+  assert.equal(await norm.FR.shouldBeActiveForUrl('https://SUB.EXAMPLE.COM./page'), false);
+  assert.equal(await norm.FR.shouldBeActiveForUrl('https://sub.example.com:8080/page'), false);
+});
+
+test('domainCandidates orders most-specific first without crossing TLDs', () => {
+  const { FR } = loadEngine();
+  // Spread into this realm: jsdom arrays carry the jsdom Array prototype,
+  // which assert.deepEqual treats as unequal.
+  assert.deepEqual([...FR.domainCandidates('a.b.example.com')], [
+    'a.b.example.com', 'b.example.com', 'example.com',
+    'www.a.b.example.com', 'www.b.example.com', 'www.example.com',
+  ]);
+  assert.deepEqual([...FR.domainCandidates('example.com')], ['example.com', 'www.example.com']);
+  assert.deepEqual([...FR.domainCandidates('localhost')], ['localhost', 'www.localhost']);
+  assert.deepEqual([...FR.domainCandidates('WWW.Example.COM.')], ['www.example.com', 'example.com']);
+  assert.deepEqual([...FR.domainCandidates('')], []);
+  // IP literals never walk parents.
+  assert.deepEqual([...FR.domainCandidates('127.0.0.1')], ['127.0.0.1', 'www.127.0.0.1']);
+});
+
+test('shared.js re-evaluation never redeclares FocusReader', () => {
+  const page = createPage({ scripts: ['shared.js'], storage: {} });
+  const first = page.window.FocusReader;
+  assert.doesNotThrow(() => {
+    page.window.eval(`${readSource('shared.js')}\n//# sourceURL=shared.js`);
+  });
+  assert.equal(page.window.FocusReader, first);
+  assert.equal(typeof page.window.FocusReader.shouldBeActiveForUrl, 'function');
+});
+
 test('isSkippable protects contenteditable containers', () => {
   const { document, FR } = loadEngine();
   const editable = document.createElement('div');
@@ -276,15 +331,15 @@ test('boldifyParagraph applies research-optimal word fixation cadence', () => {
 
 test('intensity weights and faux-bold channels are calibrated to prevent visual fatigue', () => {
   const { FR } = loadEngine();
-  // Calibrated weights: Light = 600, Medium = 750, Strong = 825
+  // Calibrated weights: Light = 600, Medium = 750, Strong = 900
   assert.equal(FR.INTENSITY_WEIGHTS.light, 600);
   assert.equal(FR.INTENSITY_WEIGHTS.medium, 750);
-  assert.equal(FR.INTENSITY_WEIGHTS.strong, 825);
+  assert.equal(FR.INTENSITY_WEIGHTS.strong, 900);
 
   // Display numbers match applied weights
   assert.equal(FR.displayWeightFor('light'), 600);
   assert.equal(FR.displayWeightFor('medium'), 750);
-  assert.equal(FR.displayWeightFor('strong'), 825);
+  assert.equal(FR.displayWeightFor('strong'), 900);
 
   // Label helper returns UI strings without numbers
   assert.equal(FR.labelFor('light'), 'Light');
@@ -293,12 +348,12 @@ test('intensity weights and faux-bold channels are calibrated to prevent visual 
 
   // Stroke width and text-shadow boosts provide clear separation
   assert.equal(FR.strokeFor('light'), 0);
-  assert.equal(FR.strokeFor('medium'), 0.05);
-  assert.equal(FR.strokeFor('strong'), 0.12);
+  assert.equal(FR.strokeFor('medium'), 0.15);
+  assert.equal(FR.strokeFor('strong'), 0.4);
 
   assert.equal(FR.boostFor('light'), 0);
   assert.equal(FR.boostFor('medium'), 0.08);
-  assert.equal(FR.boostFor('strong'), 0.18);
+  assert.equal(FR.boostFor('strong'), 0.22);
 
   // normalizeSaccade
   assert.equal(FR.normalizeSaccade('optimal'), 'optimal');

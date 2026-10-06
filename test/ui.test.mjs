@@ -1,4 +1,4 @@
-/* Unit tests for popup and options UI functionality. */
+/* Unit tests for popup UI functionality. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPage, readSource, settle } from './helpers/env.mjs';
@@ -32,11 +32,11 @@ test('popup loads and renders quick intensity dock in active state', async () =>
   const dockVal = page.document.getElementById('dockVal');
   assert.equal(dockVal.textContent, 'Strong');
 
-  // Preview applies the calibrated weight for strong (825)
+  // Preview applies the calibrated weight for strong (900)
   const preview = page.document.getElementById('previewSample');
-  assert.equal(preview.style.getPropertyValue('--wb-weight'), '825');
-  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.18');
-  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.12px');
+  assert.equal(preview.style.getPropertyValue('--wb-weight'), '900');
+  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.22');
+  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.4px');
 
   // Verify clicking Light intensity button updates storage and UI
   const lightBtn = page.document.querySelector('.dock-seg-btn[data-intensity="light"]');
@@ -74,20 +74,13 @@ test('strength preview morphs smoothly via stroke width transition', async () =>
   assert.equal(el.style.getPropertyValue('--wb-stroke'), '0.1px');
   assert.ok(el.classList.contains('is-morphing'));
 
-  // Both preview stylesheets declare @property and animate channels for smooth morphing.
+  // Preview stylesheet declares @property and animates channels for smooth morphing.
   assert.match(readSource('popup.css'), /@property\s+--wb-weight/);
   assert.match(readSource('popup.css'), /@property\s+--wb-stroke/);
   assert.match(readSource('popup.css'), /@property\s+--wb-boost/);
   assert.match(readSource('popup.css'), /-webkit-text-stroke-width:\s*var\(--wb-stroke/);
   assert.match(readSource('popup.css'), /transition:[^;]*-webkit-text-stroke-width/);
   assert.match(readSource('popup.css'), /transition:[^;]*--wb-weight/);
-
-  assert.match(readSource('options.css'), /@property\s+--wb-weight/);
-  assert.match(readSource('options.css'), /@property\s+--wb-stroke/);
-  assert.match(readSource('options.css'), /@property\s+--wb-boost/);
-  assert.match(readSource('options.css'), /-webkit-text-stroke-width:\s*var\(--wb-stroke/);
-  assert.match(readSource('options.css'), /transition:[^;]*-webkit-text-stroke-width/);
-  assert.match(readSource('options.css'), /transition:[^;]*--wb-weight/);
 });
 
 test('popup defaults to always-active when tab is unreachable and no prefs exist', async () => {
@@ -106,6 +99,44 @@ test('popup defaults to always-active when tab is unreachable and no prefs exist
   const toggleBtn = page.document.getElementById('toggleButton');
   assert.ok(toggleBtn.classList.contains('is-active'));
   assert.equal(toggleBtn.getAttribute('aria-pressed'), 'true');
+});
+
+test('popup disables the toggle on non-web pages', async () => {
+  const html = readSource('popup.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'popup.js'],
+    tabs: [{ id: 8, url: 'chrome://extensions/' }],
+    storage: {},
+    onTabMessage: () => undefined,
+  });
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const toggleBtn = page.document.getElementById('toggleButton');
+  assert.equal(toggleBtn.disabled, true);
+});
+
+test('popup re-enables a stuck-disabled toggle on valid web pages', async () => {
+  const html = readSource('popup.html');
+  const page = createPage({
+    html,
+    scripts: ['shared.js', 'popup.js'],
+    tabs: [{ id: 9, url: 'https://example.com/article' }],
+    storage: {},
+    onTabMessage: () => undefined,
+  });
+
+  // Simulate a disabled state carried over from a previous non-web tab.
+  page.document.getElementById('toggleButton').disabled = true;
+
+  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
+  await settle();
+
+  const toggleBtn = page.document.getElementById('toggleButton');
+  assert.equal(toggleBtn.disabled, false);
+  assert.equal(page.document.getElementById('pageNote').style.display, 'none');
 });
 
 test('popup theme toggle cycles dark and light', async () => {
@@ -217,196 +248,9 @@ test('popup self-heals tabs missing the content script', async () => {
   assert.equal(toggleBtn.getAttribute('aria-pressed'), 'true');
 });
 
-test('options page defaults to automatic mode and manages reading studio', async () => {
-  const html = readSource('options.html');
-  const page = createPage({
-    html,
-    scripts: ['shared.js', 'options.js'],
-    storage: { mode: 'manual', intensity: 'medium' },
-  });
 
-  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
-  await settle();
 
-  const modeManual = page.document.getElementById('modeManual');
-  const modeAuto = page.document.getElementById('modeAutomatic');
-  assert.ok(modeManual.classList.contains('is-selected'));
-  assert.ok(!modeAuto.classList.contains('is-selected'));
 
-  // Switch mode to automatic
-  modeAuto.click();
-  await settle();
-  assert.equal(page.mock.storage.mode, 'automatic');
-  assert.ok(modeAuto.classList.contains('is-selected'));
-
-  // Verify studio paragraph initialized
-  const studioParagraph = page.document.getElementById('studioParagraph');
-  assert.ok(studioParagraph);
-  assert.ok(studioParagraph.textContent.includes('visual cortex'));
-
-  // Toggle studio bionic mode
-  const toggleBtn = page.document.getElementById('studioToggleBtn');
-  const toggleLabel = page.document.getElementById('studioToggleLabel');
-  assert.equal(toggleLabel.textContent, 'Bionic Mode ON');
-
-  toggleBtn.click();
-  await settle();
-  assert.equal(toggleLabel.textContent, 'Standard Text');
-  assert.equal(studioParagraph.querySelectorAll(`.${page.window.FocusReader.BOLD_CLASS}`).length, 0);
-});
-
-test('options page defaults to automatic mode when nothing is stored', async () => {
-  const html = readSource('options.html');
-  const page = createPage({
-    html,
-    scripts: ['shared.js', 'options.js'],
-    storage: {},
-  });
-
-  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
-  await settle();
-
-  const modeAuto = page.document.getElementById('modeAutomatic');
-  assert.ok(modeAuto.classList.contains('is-selected'));
-});
-
-test('options appearance picker switches between dark and light themes', async () => {
-  const html = readSource('options.html');
-  const page = createPage({
-    html,
-    scripts: ['shared.js', 'options.js'],
-    storage: {},
-  });
-
-  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
-  await settle();
-
-  const darkBtn = page.document.querySelector('[data-theme-option="dark"]');
-  const lightBtn = page.document.querySelector('[data-theme-option="light"]');
-  assert.ok(darkBtn);
-  assert.ok(lightBtn);
-  assert.equal(page.window.document.documentElement.dataset.theme, 'dark');
-  assert.ok(darkBtn.classList.contains('is-selected'));
-
-  lightBtn.click();
-  await settle();
-
-  assert.equal(page.window.document.documentElement.dataset.theme, 'light');
-  assert.equal(page.mock.storage.theme, 'light');
-  assert.ok(lightBtn.classList.contains('is-selected'));
-  assert.ok(!darkBtn.classList.contains('is-selected'));
-});
-
-test('options page manages custom site rules', async () => {
-  const html = readSource('options.html');
-  const page = createPage({
-    html,
-    scripts: ['shared.js', 'options.js'],
-    storage: {
-      mode: 'manual',
-      intensity: 'medium',
-      'wikipedia.org': true,
-      'reddit.com': false,
-    },
-  });
-
-  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
-  await settle();
-
-  const rulesList = page.document.getElementById('siteRulesList');
-  assert.ok(rulesList);
-  assert.equal(rulesList.children.length, 2);
-
-  // Add a new rule via form
-  const newRuleHost = page.document.getElementById('newRuleHost');
-  const newRuleAction = page.document.getElementById('newRuleAction');
-  const addForm = page.document.getElementById('addRuleForm');
-
-  newRuleHost.value = 'https://news.ycombinator.com/path';
-  newRuleAction.value = 'true';
-  addForm.dispatchEvent(new page.window.Event('submit', { bubbles: true, cancelable: true }));
-  await settle();
-
-  assert.equal(page.mock.storage['news.ycombinator.com'], true);
-  assert.equal(rulesList.children.length, 3);
-
-  // Delete a rule
-  const firstDelBtn = rulesList.querySelector('.rule-del-btn');
-  assert.ok(firstDelBtn);
-  firstDelBtn.click();
-  await settle();
-
-  assert.equal(rulesList.children.length, 2);
-});
-
-test('options page manages fixation anchor density presets', async () => {
-  const html = readSource('options.html');
-  const page = createPage({
-    html,
-    scripts: ['shared.js', 'options.js'],
-    storage: { fixation: 'optimal' },
-  });
-
-  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
-  await settle();
-
-  const optBtn = page.document.querySelector('[data-fixation="optimal"]');
-  const classicBtn = page.document.querySelector('[data-fixation="classic"]');
-  const metricAnchor = page.document.getElementById('metricAnchor');
-  assert.ok(optBtn);
-  assert.ok(optBtn.classList.contains('is-selected'));
-  assert.equal(metricAnchor.textContent, '~45%');
-
-  classicBtn.click();
-  await settle();
-
-  assert.equal(page.mock.storage.fixation, 'classic');
-  assert.ok(classicBtn.classList.contains('is-selected'));
-  assert.equal(metricAnchor.textContent, '33%');
-});
-
-test('options page manages word fixation frequency presets (saccade)', async () => {
-  const html = readSource('options.html');
-  const page = createPage({
-    html,
-    scripts: ['shared.js', 'options.js'],
-    storage: { saccade: 'optimal' },
-  });
-
-  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
-  await settle();
-
-  const optBtn = page.document.querySelector('[data-saccade="optimal"]');
-  const allBtn = page.document.querySelector('[data-saccade="all"]');
-  const altBtn = page.document.querySelector('[data-saccade="alternating"]');
-  assert.ok(optBtn);
-  assert.ok(allBtn);
-  assert.ok(altBtn);
-  assert.ok(optBtn.classList.contains('is-selected'));
-
-  const intensityPreview = page.document.getElementById('intensityPreview');
-  assert.ok(intensityPreview);
-  // Optimal saccade: short function words 'to' and 'and' are unbolded
-  const optBolds = Array.from(intensityPreview.querySelectorAll('.wb')).map((s) => s.textContent);
-  assert.deepEqual(optBolds, ['re', 'fa', 'fo', 'atten', 'bo', 'rea', 'compre']);
-
-  allBtn.click();
-  await settle();
-
-  assert.equal(page.mock.storage.saccade, 'all');
-  assert.ok(allBtn.classList.contains('is-selected'));
-  assert.ok(!optBtn.classList.contains('is-selected'));
-
-  // 'All' saccade: 'to' ('t') and 'and' ('a') are now anchored with 1 letter bolded
-  const allBolds = Array.from(intensityPreview.querySelectorAll('.wb')).map((s) => s.textContent);
-  assert.deepEqual(allBolds, ['re', 'fa', 't', 'fo', 'atten', 'a', 'bo', 'rea', 'compre']);
-
-  altBtn.click();
-  await settle();
-
-  assert.equal(page.mock.storage.saccade, 'alternating');
-  assert.ok(altBtn.classList.contains('is-selected'));
-});
 
 test('popup settings gear opens preferences within extension and allows adjustments', async () => {
   const html = readSource('popup.html');
@@ -528,64 +372,5 @@ test('popup settings gear opens preferences within extension and allows adjustme
   assert.equal(viewMain.style.display, 'flex');
   assert.equal(viewSettings.style.display, 'none');
   assert.ok(!settingsWheel.classList.contains('is-active'));
-});
-
-test('options page intensity controls display only text labels without numbers and apply 600/750/825 weights', async () => {
-  const html = readSource('options.html');
-  const page = createPage({
-    html,
-    scripts: ['shared.js', 'options.js'],
-    storage: { intensity: 'medium' },
-  });
-
-  page.window.document.dispatchEvent(new page.window.Event('DOMContentLoaded'));
-  await settle();
-
-  // All strength segmented buttons must display only text labels (no numbers/meta)
-  const segButtons = Array.from(page.document.querySelectorAll('#intensityGroup .seg-item'));
-  assert.equal(segButtons.length, 3);
-  const titles = segButtons.map((b) => b.querySelector('.seg-title').textContent.trim());
-  assert.deepEqual(titles, ['Light', 'Medium', 'Strong']);
-
-  // Verify none of the buttons contain numeric seg-meta
-  segButtons.forEach((b) => {
-    assert.equal(b.querySelector('.seg-meta'), null, 'Button should not have numeric seg-meta');
-  });
-
-  // Preview badge shows 'Medium' (no numbers)
-  const badge = page.document.getElementById('previewWeightBadge');
-  assert.ok(badge);
-  assert.equal(badge.textContent, 'Medium');
-
-  // Preview element has calibrated medium weight 750
-  const preview = page.document.getElementById('intensityPreview');
-  assert.ok(preview);
-  assert.equal(preview.style.getPropertyValue('--wb-weight'), '750');
-  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.08');
-  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.05px');
-
-  // Click Strong button -> updates to 825, badge to 'Strong'
-  const strongBtn = page.document.querySelector('#intensityGroup [data-intensity="strong"]');
-  assert.ok(strongBtn);
-  strongBtn.click();
-  await settle();
-
-  assert.equal(page.mock.storage.intensity, 'strong');
-  assert.equal(badge.textContent, 'Strong');
-  assert.equal(preview.style.getPropertyValue('--wb-weight'), '825');
-  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0.18');
-  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0.12px');
-
-  // Click Light button -> updates to 600, badge to 'Light'
-  const lightBtn = page.document.querySelector('#intensityGroup [data-intensity="light"]');
-  assert.ok(lightBtn);
-  lightBtn.click();
-  await settle();
-
-  assert.equal(page.mock.storage.intensity, 'light');
-  assert.equal(badge.textContent, 'Light');
-  assert.equal(preview.style.getPropertyValue('--wb-weight'), '600');
-  assert.equal(preview.style.getPropertyValue('--wb-boost'), '0');
-  assert.equal(preview.style.getPropertyValue('--wb-stroke'), '0px');
 });
 

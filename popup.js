@@ -222,8 +222,25 @@ async function initPopup() {
       .trim()
       .toLowerCase()
       .replace(/^[a-zA-Z]+:\/\//, '')
+      .replace(/^\*\./, '')
       .replace(/\/.*$/, '')
       .trim();
+  }
+
+  // Strip port (bracket-aware) + trailing dot for same-site comparison.
+  function bareHost(host) {
+    if (FocusReader && FocusReader.normalizeHostname) {
+      return FocusReader.normalizeHostname(host);
+    }
+    let h = String(host || '').trim().toLowerCase();
+    if (h.endsWith('.')) h = h.slice(0, -1);
+    if (h.startsWith('[')) {
+      const end = h.indexOf(']');
+      return end >= 0 ? h.slice(0, end + 1) : h;
+    }
+    const first = h.indexOf(':');
+    if (first >= 0 && h.indexOf(':', first + 1) < 0) h = h.slice(0, first);
+    return h;
   }
 
   // Both spellings of a host so www / bare rules stay in sync. Storage keys
@@ -237,11 +254,18 @@ async function initPopup() {
 
   function isSameSite(a, b) {
     if (!a || !b) return false;
-    const al = String(a).toLowerCase();
-    const bl = String(b).toLowerCase();
-    if (al === bl) return true;
-    const av = hostVariants(al);
-    return av.includes(bl);
+    const ab = bareHost(a);
+    const bb = bareHost(b);
+    if (!ab || !bb) return false;
+    if (ab === bb) return true;
+    // www equivalence (legacy) + subdomain inheritance: a rule on XYZ.com
+    // governs sub.XYZ.com, so either side being the other (or its parent)
+    // counts as the same site for refresh purposes.
+    const noWww = (h) => (h.startsWith('www.') ? h.slice(4) : h);
+    const aw = noWww(ab);
+    const bw = noWww(bb);
+    if (aw === bw) return true;
+    return aw.endsWith(`.${bw}`) || bw.endsWith(`.${aw}`);
   }
 
   // Site list follows the activation mode: automatic shows exclusions
@@ -313,11 +337,26 @@ async function initPopup() {
         } catch (err) {
           console.warn('Could not remove site rule:', err);
         }
-        if (isSameSite(host, state.host)) {
-          state.override = false;
-          state.active = state.mode !== 'manual';
+        if (tab && tab.url && isSameSite(host, state.host)) {
+          // Recompute instead of assuming the mode default — a
+          // parent-domain rule may still govern this tab.
+          try {
+            const hostState = FocusReader && FocusReader.shouldBeActiveForUrl
+              ? await FocusReader.shouldBeActiveForUrl(tab.url)
+              : undefined;
+            if (hostState !== undefined) {
+              state.override = true;
+              state.active = hostState;
+            } else {
+              state.override = false;
+              state.active = state.mode !== 'manual';
+            }
+          } catch (_) {
+            state.override = false;
+            state.active = state.mode !== 'manual';
+          }
           render();
-          if (tab && tab.id != null) {
+          if (tab.id != null) {
             await sendTabMessage(tab.id, { greeting: state.active ? 'Activate' : 'Deactivate' });
           }
         }
@@ -375,10 +414,9 @@ async function initPopup() {
       const nextIntensity = FocusReader.normalizeIntensity(btn.dataset.intensity);
       if (state.intensity === nextIntensity) return;
       state.intensity = nextIntensity;
-      if (previewSample && !previewSample.classList.contains('is-active')) {
-        previewSample.classList.add('is-active');
-        if (previewState) previewState.textContent = 'Bionic';
-      }
+      // Preview follows the extension toggle (render() owns is-active):
+      // off stays plain, on stays bionic. Strength still persists so
+      // turning back on shows the new weight immediately.
       renderIntensity();
       try {
         await chrome.storage.sync.set({ intensity: nextIntensity });
@@ -519,6 +557,19 @@ async function initPopup() {
             } else {
               await chrome.storage.sync.remove(state.host);
             }
+            // A parent-domain rule may still govern this tab — recompute
+            // instead of assuming the mode default.
+            if (tab && tab.url && FocusReader && FocusReader.shouldBeActiveForUrl) {
+              try {
+                const hostState = await FocusReader.shouldBeActiveForUrl(tab.url);
+                if (hostState !== undefined) {
+                  state.override = true;
+                  state.active = hostState;
+                  render();
+                  await sendTabMessage(tab.id, { greeting: hostState ? 'Activate' : 'Deactivate' });
+                }
+              } catch (_) {}
+            }
           }
         } catch (e) {
           console.error('Storage save failed:', e);
@@ -594,6 +645,12 @@ async function initPopup() {
     showReady();
     return;
   }
+
+  // Valid web page — explicitly re-enable the toggle (a previous disabled
+  // state must never stick when switching back to an active page) and
+  // clear any stale note.
+  if (toggleBtn) toggleBtn.disabled = false;
+  setNote('');
 
   try {
     state.host = new URL(tab.url).host.toLowerCase();
